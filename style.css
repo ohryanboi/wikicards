@@ -661,6 +661,121 @@ body {
     margin-bottom: 15px;
 }
 
+.mode-card.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.mode-card .coming-soon {
+    color: var(--legendary);
+    font-weight: bold;
+    font-style: italic;
+}
+
+/* Boss Battle Styles */
+.boss-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.boss-card {
+    background: linear-gradient(135deg, #2c3e50, #1a1a2e);
+    border: 2px solid var(--legendary);
+    border-radius: 15px;
+    padding: 25px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.boss-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(255, 152, 0, 0.4);
+}
+
+.boss-card h3 {
+    color: var(--legendary);
+    margin-bottom: 10px;
+}
+
+.boss-intro {
+    text-align: center;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+}
+
+.boss-battle-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    height: calc(100vh - 100px);
+    justify-content: space-between;
+}
+
+.boss-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+.boss-card-large {
+    background: linear-gradient(135deg, var(--legendary), #c0392b);
+    border-radius: 20px;
+    overflow: hidden;
+    width: 300px;
+    box-shadow: 0 10px 40px rgba(255, 152, 0, 0.5);
+}
+
+.boss-health-container {
+    width: 300px;
+    text-align: center;
+}
+
+.boss-health-bar {
+    width: 100%;
+    height: 30px;
+    background: var(--bg-dark);
+    border-radius: 15px;
+    overflow: hidden;
+    margin-bottom: 5px;
+}
+
+.health-fill.boss {
+    background: linear-gradient(90deg, #e74c3c, #c0392b);
+}
+
+.boss-ability {
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 0.9rem;
+    max-width: 400px;
+    text-align: center;
+}
+
+.boss-battle-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    width: 100%;
+}
+
+.boss-player-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 15px 30px;
+    background: var(--bg-card);
+    border-radius: 15px;
+}
+
 /* Battle Arena */
 .battle-container {
     display: flex;
