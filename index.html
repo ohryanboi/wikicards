@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WikiCards - Wikipedia Trading Card Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Main Menu Screen -->
+        <div id="main-menu" class="screen active">
+            <div class="menu-container">
+                <h1 class="game-title">WikiCards</h1>
+                <p class="subtitle">The Wikipedia Trading Card Game</p>
+                <div class="menu-buttons">
+                    <button class="menu-btn" onclick="showScreen('pack-opening')">
+                        <span class="btn-icon">📦</span> Open Packs
+                    </button>
+                    <button class="menu-btn" onclick="showScreen('collection')">
+                        <span class="btn-icon">📚</span> Collection
+                    </button>
+                    <button class="menu-btn" onclick="showScreen('deck-builder')">
+                        <span class="btn-icon">🃏</span> Deck Builder
+                    </button>
+                    <button class="menu-btn" onclick="showScreen('battle-select')">
+                        <span class="btn-icon">⚔️</span> Battle
+                    </button>
+                    <button class="menu-btn" onclick="showScreen('boss-select')">
+                        <span class="btn-icon">👹</span> Boss Battles
+                    </button>
+                </div>
+                <div class="player-stats">
+                    <span>🃏 Cards: <span id="cards-count">0</span></span>
+                    <span>🎟️ Tickets: <span id="tickets-display">0</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pack Opening Screen -->
+        <div id="pack-opening" class="screen">
+            <div class="screen-header">
+                <button class="back-btn" onclick="showScreen('main-menu')">← Back</button>
+                <h2>Open Packs</h2>
+                <span class="tickets-display">🎟️ <span id="pack-tickets">0</span> tickets</span>
+            </div>
+            <div class="pack-selection">
+                <div id="main-pack" class="pack-card" onclick="openPack('standard')">
+                    <div id="pack-visual" class="pack-visual standard-pack">
+                        <span id="pack-icon" class="pack-icon">📦</span>
+                    </div>
+                    <h3 id="pack-title">Standard Pack</h3>
+                    <p>5 Cards</p>
+                    <p id="pack-odds" class="pack-odds">3 Common, 1+ Uncommon</p>
+                    <span class="pack-price">📺 Watch Video</span>
+                    <div id="golden-progress" class="golden-progress">
+                        <span>Next Golden: <span id="packs-until-golden">10</span> packs</span>
+                        <div class="golden-bar">
+                            <div id="golden-bar-fill" class="golden-bar-fill"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="pack-opening-animation" class="hidden">
+                <div class="pack-container">
+                    <div class="pack-3d">
+                        <div class="pack-face pack-front"></div>
+                        <div class="pack-face pack-back"></div>
+                    </div>
+                </div>
+                <p class="opening-text">Click to reveal cards!</p>
+            </div>
+            <div id="cards-reveal" class="hidden">
+                <div id="revealed-cards" class="revealed-cards-container"></div>
+                <button class="menu-btn" onclick="closePackReveal()">Collect All</button>
+            </div>
+        </div>
+
+        <!-- Collection Screen -->
+        <div id="collection" class="screen">
+            <div class="screen-header">
+                <button class="back-btn" onclick="showScreen('main-menu')">← Back</button>
+                <h2>My Collection</h2>
+                <div class="collection-filters">
+                    <select id="rarity-filter" onchange="filterCollection()">
+                        <option value="all">All Rarities</option>
+                        <option value="common">Common</option>
+                        <option value="uncommon">Uncommon</option>
+                        <option value="rare">Rare</option>
+                        <option value="epic">Epic</option>
+                        <option value="legendary">Legendary</option>
+                    </select>
+                    <select id="sort-filter" onchange="filterCollection()">
+                        <option value="newest">Newest</option>
+                        <option value="rarity">Rarity</option>
+                        <option value="attack">Attack</option>
+                        <option value="defense">Defense</option>
+                        <option value="knowledge">Knowledge</option>
+                    </select>
+                </div>
+            </div>
+            <div id="collection-grid" class="card-grid"></div>
+        </div>
+
+        <!-- Deck Builder Screen -->
+        <div id="deck-builder" class="screen">
+            <div class="screen-header">
+                <button class="back-btn" onclick="showScreen('main-menu')">← Back</button>
+                <h2>Deck Builder</h2>
+                <div class="deck-info">
+                    <span id="deck-count">0</span>/20 Cards
+                </div>
+            </div>
+            <div class="deck-builder-container">
+                <div class="deck-slots">
+                    <h3>Current Deck</h3>
+                    <div id="deck-cards" class="deck-grid"></div>
+                    <button class="menu-btn save-deck-btn" onclick="saveDeck()">Save Deck</button>
+                </div>
+                <div class="available-cards">
+                    <h3>Available Cards</h3>
+                    <div id="available-cards-grid" class="card-grid small"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Battle Select Screen -->
+        <div id="battle-select" class="screen">
+            <div class="screen-header">
+                <button class="back-btn" onclick="showScreen('main-menu')">← Back</button>
+                <h2>Select Battle Mode</h2>
+            </div>
+            <div class="battle-modes">
+                <div class="mode-card" onclick="startBattle('ai')">
+                    <span class="mode-icon">🤖</span>
+                    <h3>VS AI</h3>
+                    <p>Battle against an AI opponent</p>
+                </div>
+                <div class="mode-card" onclick="startBattle('practice')">
+                    <span class="mode-icon">🎯</span>
+                    <h3>Practice</h3>
+                    <p>Test your deck against dummies</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Battle Arena Screen -->
+        <div id="battle-arena" class="screen">
+            <!-- Battle Help Panel -->
+            <div id="battle-help" class="battle-help">
+                <div class="help-header">
+                    <span>📖 How to Play</span>
+                    <button onclick="toggleBattleHelp()" class="help-close">×</button>
+                </div>
+                <div class="help-content">
+                    <p><strong>1. Play Cards:</strong> Click cards in your hand to play them (costs ⚡ energy)</p>
+                    <p><strong>2. Attack:</strong> Click your field cards (glowing green) to select, then click enemy cards</p>
+                    <p><strong>3. Win:</strong> Reduce opponent's ❤️ HP to 0!</p>
+                    <p><em>Cards can't attack the turn they're played</em></p>
+                </div>
+            </div>
+            <button id="show-help-btn" class="show-help-btn" onclick="toggleBattleHelp()">❓</button>
+
+            <!-- Phase Indicator -->
+            <div id="phase-indicator" class="phase-indicator">
+                <span id="phase-text">Your Turn</span>
+            </div>
+
+            <!-- Action Hint -->
+            <div id="action-hint" class="action-hint">
+                <span id="hint-text">Play cards from your hand or attack with your field cards</span>
+            </div>
+
+            <div class="battle-container">
+                <div class="opponent-area">
+                    <div class="player-info opponent">
+                        <span class="player-name">🤖 Opponent</span>
+                        <div class="health-bar">
+                            <div id="opponent-health-bar" class="health-fill"></div>
+                            <span id="opponent-health">30</span>/30 ❤️
+                        </div>
+                        <span class="energy">⚡ <span id="opponent-energy">0</span>/10</span>
+                    </div>
+                    <div id="opponent-field" class="card-field">
+                        <span class="field-label">Enemy Field</span>
+                    </div>
+                    <div id="opponent-hand" class="card-hand opponent-hand"></div>
+                </div>
+                <div class="battle-info">
+                    <div id="battle-log" class="battle-log"></div>
+                    <button id="end-turn-btn" class="menu-btn" onclick="endTurn()">⏭️ End Turn</button>
+                </div>
+                <div class="player-area">
+                    <div id="player-field" class="card-field">
+                        <span class="field-label">Your Field (click cards to attack)</span>
+                    </div>
+                    <div id="player-hand" class="card-hand">
+                        <span class="hand-label">Your Hand (click to play)</span>
+                    </div>
+                    <div class="player-info">
+                        <span class="player-name">👤 You</span>
+                        <div class="health-bar">
+                            <div id="player-health-bar" class="health-fill"></div>
+                            <span id="player-health">30</span>/30 ❤️
+                        </div>
+                        <span class="energy">⚡ <span id="player-energy">0</span>/10</span>
+                    </div>
+                </div>
+            </div>
+            <button class="forfeit-btn" onclick="forfeitBattle()">🏳️ Forfeit</button>
+        </div>
+
+        <!-- Boss Select Screen -->
+        <div id="boss-select" class="screen">
+            <div class="screen-header">
+                <button class="back-btn" onclick="showScreen('main-menu')">← Back</button>
+                <h2>Boss Battles</h2>
+            </div>
+            <p class="boss-intro">Challenge the mightiest Wikipedia articles!</p>
+            <div id="boss-list" class="boss-grid"></div>
+        </div>
+
+        <!-- Boss Battle Screen -->
+        <div id="boss-battle" class="screen">
+            <div class="boss-battle-container">
+                <div class="boss-area">
+                    <div id="boss-card-display" class="boss-card-large"></div>
+                    <div class="boss-health-container">
+                        <div class="boss-health-bar">
+                            <div id="boss-health-fill" class="health-fill boss"></div>
+                        </div>
+                        <span id="boss-health-text">0/0</span>
+                    </div>
+                    <div id="boss-ability-text" class="boss-ability"></div>
+                </div>
+                <div class="boss-battle-controls">
+                    <div id="boss-player-hand" class="card-hand"></div>
+                    <div class="boss-player-info">
+                        <div class="health-bar">
+                            <div id="boss-player-health-bar" class="health-fill"></div>
+                            <span id="boss-player-health">30</span>/30
+                        </div>
+                        <span class="energy">⚡ <span id="boss-player-energy">0</span></span>
+                        <button class="menu-btn" onclick="bossTurn()">End Turn</button>
+                    </div>
+                </div>
+            </div>
+            <button class="forfeit-btn" onclick="forfeitBoss()">Retreat</button>
+        </div>
+
+        <!-- Card Preview Modal -->
+        <div id="card-modal" class="modal hidden">
+            <div class="modal-content">
+                <span class="close-modal" onclick="closeModal()">&times;</span>
+                <div id="modal-card-display"></div>
+                <div id="modal-card-info"></div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="loading-overlay hidden">
+            <div class="loading-spinner"></div>
+            <p id="loading-text">Loading...</p>
+        </div>
+
+        <!-- Victory/Defeat Modal -->
+        <div id="result-modal" class="modal hidden">
+            <div class="modal-content result-content">
+                <h2 id="result-title"></h2>
+                <p id="result-message"></p>
+                <div id="result-rewards"></div>
+                <button class="menu-btn" onclick="closeResultModal()">Continue</button>
+            </div>
+        </div>
+
+        <!-- Video Ad Modal -->
+        <div id="video-ad-modal" class="modal hidden">
+            <div class="modal-content video-ad-content">
+                <h2>📺 Watch to Open Pack</h2>
+                <p class="video-instruction">Watch this short video to open your pack!</p>
+                <div id="video-container" class="video-container">
+                    <video id="ad-video" playsinline>
+                        <source src="" type="video/mp4">
+                        Your browser does not support video.
+                    </video>
+                    <div id="video-placeholder" class="video-placeholder">
+                        <span>🎬</span>
+                        <p>Video Ad Placeholder</p>
+                    </div>
+                </div>
+                <div class="video-timer">
+                    <div id="video-progress-bar" class="video-progress-bar">
+                        <div id="video-progress-fill" class="video-progress-fill"></div>
+                    </div>
+                    <span id="video-countdown">10</span> seconds remaining
+                </div>
+                <button id="skip-video-btn" class="menu-btn" disabled onclick="skipVideo()">
+                    Please wait...
+                </button>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
+
