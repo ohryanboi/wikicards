@@ -1,2150 +1,2663 @@
-/* WikiCards - Main Styles */
-:root {
-    --bg-dark: #0a0a1a;
-    --bg-card: #1a1a2e;
-    --bg-light: #16213e;
-    --accent-primary: #4a90d9;
-    --accent-secondary: #9b59b6;
-    --text-primary: #ffffff;
-    --text-secondary: #b8b8b8;
-    --common: #9e9e9e;
-    --uncommon: #4caf50;
-    --rare: #2196f3;
-    --epic: #9c27b0;
-    --legendary: #ff9800;
-    --gold: #ffd700;
-    --health: #e74c3c;
-    --energy: #f39c12;
-}
+// WikiCards - Wikipedia Trading Card Game
+// ==========================================
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-/* Utility Classes */
-.hidden {
-    display: none !important;
-}
-
-/* Modal Base Styles */
-.modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.9);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-}
-
-.modal-content {
-    background: linear-gradient(135deg, var(--bg-card), var(--bg-light));
-    border-radius: 15px;
-    padding: 30px;
-    max-width: 500px;
-    width: 90%;
-    text-align: center;
-    border: 2px solid var(--accent-primary);
-    box-shadow: 0 0 30px rgba(74, 144, 217, 0.3);
-}
-
-/* Notification Animations */
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateX(-50%) translateY(-20px);
+// Game State
+const gameState = {
+    tickets: 10, // Start with 10 free packs
+    packsOpened: 0, // Track total packs opened for golden pack
+    totalPacksOpened: 0, // Lifetime packs opened
+    battlesWon: 0, // Track battle wins
+    cards: [],
+    deck: [],
+    currentBattle: null,
+    playerHealth: 30,
+    playerEnergy: 0,
+    opponentHealth: 30,
+    opponentEnergy: 0,
+    playerField: [],
+    opponentField: [],
+    playerHand: [],
+    opponentHand: [],
+    turn: 'player',
+    bossBattle: null,
+    achievements: {
+        firstWin: false,
+        collector: false,
+        goldenTouch: false,
+        wikiScholar: false
     }
-    to {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
+};
+
+// Achievement Definitions
+const ACHIEVEMENTS = {
+    firstWin: {
+        id: 'firstWin',
+        name: 'First Victory',
+        description: 'Win your first battle',
+        icon: '🏆',
+        check: () => gameState.battlesWon >= 1
+    },
+    collector: {
+        id: 'collector',
+        name: 'Card Collector',
+        description: 'Own 50 cards',
+        icon: '📚',
+        check: () => gameState.cards.length >= 50
+    },
+    goldenTouch: {
+        id: 'goldenTouch',
+        name: 'Golden Touch',
+        description: 'Open your first Golden Pack',
+        icon: '👑',
+        check: () => gameState.totalPacksOpened >= 10
+    },
+    wikiScholar: {
+        id: 'wikiScholar',
+        name: 'Wikipedia Scholar',
+        description: 'Have cards from 10 different categories',
+        icon: '🎓',
+        check: () => {
+            const categories = new Set(gameState.cards.map(c => c.category || 'Unknown'));
+            return categories.size >= 10;
+        }
     }
-}
+};
 
-@keyframes fadeOut {
-    to {
-        opacity: 0;
-        transform: translateX(-50%) translateY(-10px);
+// ==========================================
+// VIDEO AD SYSTEM
+// ==========================================
+// Add your video URLs here - the system will randomly select one
+const VIDEO_ADS = [
+    "videoplayback.mp4",
+    "videoad2.mp4",
+    "videoad3.mp4",
+    "videoad4.mp4",
+    "videoad5.mp4",
+    "videoad6.mp4",
+    "videoad7.mp4",
+    // Add more video URLs here like:
+    // "https://example.com/video1.mp4",
+    // "https://example.com/video2.mp4",
+];
+
+const videoAdState = {
+    isPlaying: false,
+    countdown: 10,
+    interval: null,
+    pendingPackType: null,
+    onComplete: null
+};
+
+function showVideoAd(packType) {
+    // Clear any existing interval
+    if (videoAdState.interval) {
+        clearInterval(videoAdState.interval);
     }
-}
 
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: var(--bg-dark);
-    color: var(--text-primary);
-    min-height: 100vh;
-    overflow-x: hidden;
-}
+    videoAdState.pendingPackType = packType;
+    videoAdState.countdown = 10;
+    videoAdState.isPlaying = true;
 
-#app {
-    width: 100%;
-    min-height: 100vh;
-}
+    const modal = document.getElementById('video-ad-modal');
+    const video = document.getElementById('ad-video');
+    const placeholder = document.getElementById('video-placeholder');
+    const progressFill = document.getElementById('video-progress-fill');
+    const countdownEl = document.getElementById('video-countdown');
+    const skipBtn = document.getElementById('skip-video-btn');
 
-.screen {
-    display: none;
-    width: 100%;
-    min-height: 100vh;
-    padding: 20px;
-    animation: fadeIn 0.3s ease;
-}
+    // Reset UI
+    progressFill.style.width = '0%';
+    countdownEl.textContent = '10';
+    skipBtn.disabled = true;
+    skipBtn.textContent = 'Please wait...';
 
-.screen.active {
-    display: block;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.hidden {
-    display: none !important;
-}
-
-/* Modal Styles */
-.modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.85);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
-
-.modal-content {
-    background: var(--bg-card);
-    border-radius: 20px;
-    padding: 30px;
-    max-width: 90%;
-    max-height: 90%;
-    overflow: auto;
-}
-
-/* Main Menu */
-.menu-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    text-align: center;
-}
-
-.game-title {
-    font-size: 4rem;
-    font-weight: 800;
-    background: linear-gradient(135deg, var(--accent-primary), var(--legendary));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    text-shadow: 0 0 50px rgba(74, 144, 217, 0.5);
-    margin-bottom: 10px;
-    animation: titleGlow 2s ease-in-out infinite alternate;
-}
-
-@keyframes titleGlow {
-    from { filter: drop-shadow(0 0 20px rgba(74, 144, 217, 0.5)); }
-    to { filter: drop-shadow(0 0 40px rgba(255, 152, 0, 0.5)); }
-}
-
-.subtitle {
-    font-size: 1.2rem;
-    color: var(--text-secondary);
-    margin-bottom: 40px;
-}
-
-.menu-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-    width: 100%;
-    max-width: 300px;
-}
-
-.menu-btn {
-    background: linear-gradient(135deg, var(--bg-light), var(--bg-card));
-    border: 2px solid var(--accent-primary);
-    color: var(--text-primary);
-    padding: 15px 30px;
-    font-size: 1.1rem;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-}
-
-.menu-btn:hover {
-    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-    transform: translateY(-3px);
-    box-shadow: 0 10px 30px rgba(74, 144, 217, 0.3);
-}
-
-.btn-icon {
-    font-size: 1.3rem;
-}
-
-.player-stats {
-    margin-top: 40px;
-    display: flex;
-    gap: 30px;
-    font-size: 1.1rem;
-    color: var(--text-secondary);
-}
-
-/* Screen Header */
-.screen-header {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    padding: 10px 0;
-    margin-bottom: 20px;
-    border-bottom: 1px solid var(--bg-light);
-}
-
-.back-btn {
-    background: transparent;
-    border: 1px solid var(--accent-primary);
-    color: var(--accent-primary);
-    padding: 8px 15px;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.back-btn:hover {
-    background: var(--accent-primary);
-    color: var(--text-primary);
-}
-
-.screen-header h2 {
-    flex: 1;
-    font-size: 1.5rem;
-}
-
-.gold-display {
-    color: var(--gold);
-    font-weight: bold;
-}
-
-/* Pack Selection */
-.pack-selection {
-    display: flex;
-    justify-content: center;
-    gap: 30px;
-    flex-wrap: wrap;
-    padding: 40px 0;
-}
-
-.pack-card {
-    background: var(--bg-card);
-    border-radius: 20px;
-    padding: 40px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    width: 280px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-}
-
-.pack-card h3,
-.pack-card p,
-.pack-card span {
-    width: 100%;
-    text-align: center;
-}
-
-.pack-card h3 {
-    margin: 15px 0 10px;
-    font-size: 1.4rem;
-}
-
-.pack-card:hover {
-    transform: translateY(-10px);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-}
-
-.pack-visual {
-    width: 180px;
-    height: 220px;
-    margin: 0 auto 20px;
-    border-radius: 15px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 4rem;
-}
-
-.standard-pack {
-    background: linear-gradient(135deg, #3498db, #2c3e50);
-}
-
-.premium-pack {
-    background: linear-gradient(135deg, #9b59b6, #8e44ad);
-    animation: premiumGlow 2s ease-in-out infinite alternate;
-}
-
-@keyframes premiumGlow {
-    from { box-shadow: 0 0 20px rgba(155, 89, 182, 0.5); }
-    to { box-shadow: 0 0 40px rgba(255, 152, 0, 0.5); }
-}
-
-.trending-pack {
-    background: linear-gradient(135deg, #e74c3c, #f39c12);
-    animation: trendingPulse 1.5s ease-in-out infinite;
-}
-
-@keyframes trendingPulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-}
-
-/* Golden Pack Animation Styles */
-.pack-face-premium.golden {
-    background: linear-gradient(135deg, #ffd700, #ffed4a, #ffc107) !important;
-    box-shadow: 0 0 40px rgba(255, 215, 0, 0.8) !important;
-}
-
-.pack-odds {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    margin-top: 10px;
-}
-
-/* Pack Opening Animation */
-#pack-opening-animation {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.9);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-}
-
-.pack-container {
-    perspective: 1000px;
-    cursor: pointer;
-}
-
-.pack-3d {
-    width: 200px;
-    height: 280px;
-    position: relative;
-    transform-style: preserve-3d;
-    animation: packFloat 2s ease-in-out infinite;
-}
-
-@keyframes packFloat {
-    0%, 100% { transform: translateY(0) rotateY(0deg); }
-    50% { transform: translateY(-20px) rotateY(10deg); }
-}
-
-.pack-face {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    border-radius: 15px;
-    backface-visibility: hidden;
-}
-
-.pack-front {
-    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 4rem;
-}
-
-.pack-back {
-    background: linear-gradient(135deg, var(--legendary), var(--epic));
-    transform: rotateY(180deg);
-}
-
-.opening-text {
-    margin-top: 30px;
-    font-size: 1.2rem;
-    color: var(--text-secondary);
-    animation: textPulse 1s ease-in-out infinite;
-}
-
-@keyframes textPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
-
-/* Card Reveal */
-.revealed-cards-container {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    flex-wrap: wrap;
-    padding: 40px;
-    max-width: 1200px;
-    margin: 0 auto;
-}
-
-/* Card Styles */
-.card {
-    width: 180px;
-    height: 260px;
-    border-radius: 12px;
-    background: var(--bg-card);
-    position: relative;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    overflow: hidden;
-}
-
-.card:hover {
-    transform: translateY(-10px) scale(1.05);
-    z-index: 10;
-}
-
-.card-inner {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-.card-image {
-    width: 100%;
-    height: 100px;
-    background: var(--bg-light);
-    background-size: cover;
-    background-position: center;
-}
-
-.card-content {
-    padding: 10px;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.card-name {
-    font-size: 0.9rem;
-    font-weight: bold;
-    margin-bottom: 5px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.card-description {
-    font-size: 0.7rem;
-    color: var(--text-secondary);
-    flex: 1;
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-}
-
-.card-stats {
-    display: flex;
-    justify-content: space-between;
-    padding: 5px 0;
-    font-size: 0.75rem;
-    border-top: 1px solid var(--bg-light);
-    margin-top: 5px;
-}
-
-.stat {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-}
-
-.card-ability {
-    font-size: 0.65rem;
-    color: var(--legendary);
-    font-style: italic;
-    margin-top: 5px;
-}
-
-.card-cost {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 28px;
-    height: 28px;
-    background: var(--energy);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 0.9rem;
-}
-
-/* Rarity Borders */
-.card.common {
-    border: 3px solid var(--common);
-}
-
-.card.uncommon {
-    border: 3px solid var(--uncommon);
-    box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
-}
-
-.card.rare {
-    border: 3px solid var(--rare);
-    box-shadow: 0 0 20px rgba(33, 150, 243, 0.4);
-}
-
-.card.epic {
-    border: 3px solid var(--epic);
-    box-shadow: 0 0 25px rgba(156, 39, 176, 0.5);
-    animation: epicGlow 2s ease-in-out infinite alternate;
-}
-
-@keyframes epicGlow {
-    from { box-shadow: 0 0 15px rgba(156, 39, 176, 0.4); }
-    to { box-shadow: 0 0 30px rgba(156, 39, 176, 0.7); }
-}
-
-.card.legendary {
-    border: 3px solid var(--legendary);
-    box-shadow: 0 0 30px rgba(255, 152, 0, 0.6);
-    animation: legendaryGlow 1.5s ease-in-out infinite alternate;
-}
-
-@keyframes legendaryGlow {
-    from {
-        box-shadow: 0 0 20px rgba(255, 152, 0, 0.5);
-        border-color: var(--legendary);
+    // Check if we have videos configured
+    if (VIDEO_ADS.length > 0) {
+        const randomVideo = VIDEO_ADS[Math.floor(Math.random() * VIDEO_ADS.length)];
+        video.querySelector('source').src = randomVideo;
+        video.load();
+        video.style.display = 'block';
+        placeholder.style.display = 'none';
+        video.play().catch(() => {
+            // Video failed, use placeholder
+            video.style.display = 'none';
+            placeholder.style.display = 'flex';
+        });
+    } else {
+        // Use placeholder
+        video.style.display = 'none';
+        placeholder.style.display = 'flex';
     }
-    to {
-        box-shadow: 0 0 40px rgba(255, 215, 0, 0.8);
-        border-color: var(--gold);
+
+    modal.classList.remove('hidden');
+
+    // Start countdown
+    videoAdState.interval = setInterval(() => {
+        videoAdState.countdown--;
+        countdownEl.textContent = videoAdState.countdown;
+
+        const progress = ((10 - videoAdState.countdown) / 10) * 100;
+        progressFill.style.width = `${progress}%`;
+
+        if (videoAdState.countdown <= 0) {
+            clearInterval(videoAdState.interval);
+            skipBtn.disabled = false;
+            skipBtn.textContent = '✓ Open Pack!';
+        } else {
+            skipBtn.textContent = `Wait ${videoAdState.countdown}s...`;
+        }
+    }, 1000);
+}
+
+function skipVideo() {
+    if (videoAdState.countdown > 0) return;
+
+    clearInterval(videoAdState.interval);
+
+    const modal = document.getElementById('video-ad-modal');
+    const video = document.getElementById('ad-video');
+
+    video.pause();
+    video.currentTime = 0; // Reset video for next time
+    modal.classList.add('hidden');
+
+    // Reset video ad state BEFORE opening pack
+    videoAdState.isPlaying = false;
+    videoAdState.pendingPackType = null;
+    videoAdState.countdown = 10;
+
+    // Give player 10 tickets for watching the ad
+    gameState.tickets += 10;
+    saveGameState();
+    updateUI();
+
+    // Show reward notification
+    showNotification('🎉 +10 Pack Tickets!');
+
+    // Then open the pack immediately
+    actuallyOpenPack();
+}
+
+function showNotification(message, isAchievement = false) {
+    const notification = document.createElement('div');
+    notification.className = 'notification';
+    notification.innerHTML = message;
+
+    const bgStyle = isAchievement
+        ? 'background: linear-gradient(135deg, #9c27b0, #e91e63);'
+        : 'background: linear-gradient(135deg, var(--gold), #ffed4a);';
+    const colorStyle = isAchievement ? 'color: #fff;' : 'color: #000;';
+
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        ${bgStyle}
+        ${colorStyle}
+        padding: 15px 30px;
+        border-radius: 10px;
+        font-weight: bold;
+        font-size: 1.2rem;
+        z-index: 2000;
+        animation: slideDown 0.3s ease, fadeOut 0.3s ease 2.5s forwards;
+        box-shadow: 0 5px 20px rgba(156, 39, 176, 0.5);
+        text-align: center;
+    `;
+    document.body.appendChild(notification);
+
+    setTimeout(() => notification.remove(), 3000);
+}
+
+// Achievement System
+function checkAchievements() {
+    let newAchievements = [];
+
+    for (const [key, achievement] of Object.entries(ACHIEVEMENTS)) {
+        if (!gameState.achievements[key] && achievement.check()) {
+            gameState.achievements[key] = true;
+            newAchievements.push(achievement);
+        }
+    }
+
+    // Show notifications for new achievements
+    newAchievements.forEach((achievement, index) => {
+        setTimeout(() => {
+            showNotification(
+                `${achievement.icon} Achievement Unlocked!<br><strong>${achievement.name}</strong>`,
+                true
+            );
+        }, index * 1500);
+    });
+
+    if (newAchievements.length > 0) {
+        saveGameState();
+        updateAchievementsDisplay();
     }
 }
 
-.rarity-badge {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 0.6rem;
-    font-weight: bold;
-    text-transform: uppercase;
+function updateAchievementsDisplay() {
+    const container = document.getElementById('achievements-container');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    for (const [key, achievement] of Object.entries(ACHIEVEMENTS)) {
+        const isUnlocked = gameState.achievements[key];
+        const badge = document.createElement('div');
+        badge.className = `achievement-badge ${isUnlocked ? 'unlocked' : 'locked'}`;
+        badge.innerHTML = `
+            <span class="achievement-icon">${achievement.icon}</span>
+            <div class="achievement-info">
+                <span class="achievement-name">${achievement.name}</span>
+                <span class="achievement-desc">${achievement.description}</span>
+            </div>
+        `;
+        container.appendChild(badge);
+    }
 }
 
-.rarity-badge.common { background: var(--common); }
-.rarity-badge.uncommon { background: var(--uncommon); }
-.rarity-badge.rare { background: var(--rare); }
-.rarity-badge.epic { background: var(--epic); }
-.rarity-badge.legendary { background: var(--legendary); }
+// Rarity thresholds based on article length
+const RARITY_THRESHOLDS = {
+    common: { min: 0, max: 3000, color: '#9e9e9e' },
+    uncommon: { min: 3000, max: 10000, color: '#4caf50' },
+    rare: { min: 10000, max: 25000, color: '#2196f3' },
+    epic: { min: 25000, max: 50000, color: '#9c27b0' },
+    legendary: { min: 50000, max: Infinity, color: '#ff9800' }
+};
 
-/* Card Grid */
-.card-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 20px;
-    padding: 20px;
-    max-width: 1400px;
-    margin: 0 auto;
+// Rarity drop chances (in percentage) - much rarer now!
+const RARITY_CHANCES = {
+    legendary: 1,    // 1% chance
+    epic: 4,         // 4% chance
+    rare: 10,        // 10% chance
+    uncommon: 25,    // 25% chance
+    common: 60       // 60% chance
+};
+
+// Energy costs by rarity
+const ENERGY_COSTS = {
+    common: 1,
+    uncommon: 2,
+    rare: 3,
+    epic: 4,
+    legendary: 5
+};
+
+// Boss articles - longest Wikipedia articles
+const BOSS_ARTICLES = [
+    { title: 'World_War_II', name: 'World War II', description: 'The deadliest conflict in human history' },
+    { title: 'United_States', name: 'United States', description: 'A superpower nation of knowledge' },
+    { title: 'List_of_compositions_by_Franz_Schubert', name: 'Franz Schubert', description: 'Master of musical compositions' },
+    { title: 'History_of_India', name: 'History of India', description: 'Ancient civilization of wisdom' },
+    { title: 'List_of_Unicode_characters', name: 'Unicode Master', description: 'The keeper of all characters' }
+];
+
+// Ability keywords and their effects
+const ABILITY_KEYWORDS = {
+    science: { name: 'Scientific Breakthrough', effect: 'Gain +2 Knowledge each turn', keywords: ['science', 'physics', 'chemistry', 'biology', 'research', 'experiment', 'theory'] },
+    history: { name: 'Historical Impact', effect: 'Deal +3 bonus damage when played', keywords: ['history', 'war', 'battle', 'ancient', 'century', 'historical', 'empire'] },
+    person: { name: 'Hero\'s Legacy', effect: 'Inspire: +1 Attack to adjacent cards', keywords: ['born', 'politician', 'actor', 'singer', 'president', 'leader', 'famous'] },
+    animal: { name: 'Natural Defense', effect: 'Reduce incoming damage by 2', keywords: ['species', 'animal', 'mammal', 'bird', 'fish', 'wildlife', 'habitat'] },
+    technology: { name: 'Tech Boost', effect: 'Buff all friendly cards +1/+1', keywords: ['technology', 'computer', 'software', 'digital', 'internet', 'electronic'] },
+    geography: { name: 'Territorial Advantage', effect: 'Cannot be targeted for 1 turn', keywords: ['country', 'city', 'located', 'population', 'capital', 'region'] },
+    art: { name: 'Creative Inspiration', effect: 'Draw an extra card', keywords: ['art', 'music', 'painting', 'artist', 'composer', 'film', 'movie'] },
+    sport: { name: 'Athletic Power', effect: '+2 Attack when attacking', keywords: ['sport', 'player', 'team', 'championship', 'game', 'football', 'basketball'] }
+};
+
+// Initialize game
+document.addEventListener('DOMContentLoaded', () => {
+    loadGameState();
+    updateUI();
+    initializeBosses();
+});
+
+// ==========================================
+// Wikipedia API Functions
+// ==========================================
+
+async function fetchRandomArticle() {
+    try {
+        const response = await fetch('https://en.wikipedia.org/api/rest_v1/page/random/summary');
+        if (!response.ok) throw new Error('Failed to fetch article');
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error fetching random article:', error);
+        return null;
+    }
 }
 
-.card-grid.small {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+async function fetchArticleDetails(title) {
+    try {
+        const encodedTitle = encodeURIComponent(title);
+        
+        // Fetch summary
+        const summaryResponse = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodedTitle}`);
+        const summaryData = await summaryResponse.json();
+        
+        // Fetch full article info for more stats
+        const infoResponse = await fetch(`https://en.wikipedia.org/w/api.php?action=query&titles=${encodedTitle}&prop=info|categories|links&pllimit=500&cllimit=50&format=json&origin=*`);
+        const infoData = await infoResponse.json();
+        
+        const pages = infoData.query.pages;
+        const pageId = Object.keys(pages)[0];
+        const pageInfo = pages[pageId];
+        
+        return {
+            title: summaryData.title,
+            extract: summaryData.extract || 'No description available',
+            image: summaryData.thumbnail?.source || null,
+            length: pageInfo?.length || summaryData.extract?.length || 1000,
+            links: pageInfo?.links?.length || 0,
+            categories: pageInfo?.categories?.length || 0
+        };
+    } catch (error) {
+        console.error('Error fetching article details:', error);
+        return null;
+    }
 }
 
-.card-grid.small .card {
-    width: 150px;
-    height: 220px;
+async function fetchTrendingArticles() {
+    try {
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        const year = yesterday.getFullYear();
+        const month = String(yesterday.getMonth() + 1).padStart(2, '0');
+        const day = String(yesterday.getDate()).padStart(2, '0');
+        
+        const response = await fetch(
+            `https://wikimedia.org/api/rest_v1/metrics/pageviews/top/en.wikipedia/all-access/${year}/${month}/${day}`
+        );
+        
+        if (!response.ok) throw new Error('Failed to fetch trending');
+        const data = await response.json();
+        
+        // Filter out main page and special pages
+        const articles = data.items[0].articles
+            .filter(a => !a.article.includes(':') && a.article !== 'Main_Page')
+            .slice(0, 20);
+        
+        return articles;
+    } catch (error) {
+        console.error('Error fetching trending:', error);
+        return [];
+    }
 }
 
-/* Collection Filters */
-.collection-filters {
-    display: flex;
-    gap: 10px;
+// ==========================================
+// Card Generation
+// ==========================================
+
+function determineRarity(articleLength) {
+    // Use random chance system for rarity (article length gives small bonus)
+    const roll = Math.random() * 100;
+
+    // Longer articles get a slight bonus to rarity roll
+    const lengthBonus = Math.min(articleLength / 10000, 5); // Max 5% bonus
+    const adjustedRoll = roll - lengthBonus;
+
+    // Cumulative chance check (lower roll = rarer)
+    if (adjustedRoll < RARITY_CHANCES.legendary) return 'legendary';        // 1%
+    if (adjustedRoll < RARITY_CHANCES.legendary + RARITY_CHANCES.epic) return 'epic';  // 1-5%
+    if (adjustedRoll < RARITY_CHANCES.legendary + RARITY_CHANCES.epic + RARITY_CHANCES.rare) return 'rare';  // 5-15%
+    if (adjustedRoll < RARITY_CHANCES.legendary + RARITY_CHANCES.epic + RARITY_CHANCES.rare + RARITY_CHANCES.uncommon) return 'uncommon';  // 15-40%
+    return 'common';  // 60%
 }
 
-.collection-filters select {
-    padding: 8px 15px;
-    background: var(--bg-card);
-    border: 1px solid var(--accent-primary);
-    color: var(--text-primary);
-    border-radius: 5px;
-    cursor: pointer;
+function generateAbility(extract, categories) {
+    const text = (extract + ' ' + (categories || '')).toLowerCase();
+    
+    for (const [type, abilityData] of Object.entries(ABILITY_KEYWORDS)) {
+        for (const keyword of abilityData.keywords) {
+            if (text.includes(keyword)) {
+                return {
+                    name: abilityData.name,
+                    effect: abilityData.effect,
+                    type: type
+                };
+            }
+        }
+    }
+    
+    // Default ability
+    return {
+        name: 'Knowledge Power',
+        effect: '+1 to all stats',
+        type: 'default'
+    };
 }
 
-/* Deck Builder */
-.deck-builder-container {
-    display: grid;
-    grid-template-columns: 1fr 2fr;
-    gap: 30px;
-    height: calc(100vh - 100px);
+// Rarity stat bonuses - higher rarity = much better stats
+const RARITY_STAT_BONUSES = {
+    common:    { attack: 0,  defense: 0,  knowledge: 0,  minAttack: 1,  maxAttack: 5 },
+    uncommon:  { attack: 4,  defense: 3,  knowledge: 2,  minAttack: 5,  maxAttack: 10 },
+    rare:      { attack: 10, defense: 8,  knowledge: 6,  minAttack: 12, maxAttack: 18 },
+    epic:      { attack: 18, defense: 15, knowledge: 12, minAttack: 22, maxAttack: 30 },
+    legendary: { attack: 30, defense: 25, knowledge: 20, minAttack: 35, maxAttack: 50 }
+};
+
+function calculateStats(articleData, rarity) {
+    const { length, links, categories } = articleData;
+    const bonus = RARITY_STAT_BONUSES[rarity] || RARITY_STAT_BONUSES.common;
+
+    // Base stats from article data (small contribution)
+    const baseAttack = Math.floor(Math.log10(length + 1) * 1.5) + Math.floor(Math.random() * 2);
+    const baseDefense = Math.floor((categories || 1) * 0.3) + Math.floor(Math.random() * 2);
+    const baseKnowledge = Math.floor((links || 1) * 0.05) + Math.floor(Math.random() * 2);
+
+    // Apply rarity bonuses (major contribution)
+    let attack = baseAttack + bonus.attack + Math.floor(Math.random() * 3);
+    let defense = baseDefense + bonus.defense + Math.floor(Math.random() * 2);
+    let knowledge = baseKnowledge + bonus.knowledge + Math.floor(Math.random() * 2);
+
+    // Ensure stats are within rarity-appropriate ranges
+    attack = Math.min(Math.max(attack, bonus.minAttack), bonus.maxAttack + 3);
+    defense = Math.min(Math.max(defense, 1), bonus.maxAttack);
+    knowledge = Math.min(Math.max(knowledge, 1), bonus.maxAttack);
+
+    return { attack, defense, knowledge };
 }
 
-.deck-slots {
-    background: var(--bg-card);
-    border-radius: 15px;
-    padding: 20px;
-    overflow-y: auto;
+// Category keywords for card classification
+const CATEGORY_KEYWORDS = {
+    'Science': ['science', 'physics', 'chemistry', 'biology', 'mathematics', 'astronomy', 'theory', 'experiment'],
+    'History': ['history', 'war', 'ancient', 'century', 'empire', 'dynasty', 'battle', 'revolution'],
+    'Technology': ['technology', 'computer', 'software', 'internet', 'digital', 'electronic', 'robot', 'ai'],
+    'Nature': ['animal', 'plant', 'species', 'habitat', 'ecosystem', 'wildlife', 'ocean', 'forest'],
+    'Arts': ['art', 'music', 'painting', 'sculpture', 'artist', 'composer', 'film', 'theater'],
+    'Sports': ['sport', 'football', 'basketball', 'olympic', 'championship', 'athlete', 'team', 'league'],
+    'Geography': ['country', 'city', 'mountain', 'river', 'island', 'continent', 'capital', 'population'],
+    'People': ['born', 'died', 'politician', 'actor', 'singer', 'author', 'president', 'leader'],
+    'Culture': ['culture', 'tradition', 'festival', 'religion', 'language', 'cuisine', 'mythology'],
+    'Medicine': ['disease', 'treatment', 'medical', 'hospital', 'doctor', 'health', 'symptom', 'drug']
+};
+
+function determineCategory(text) {
+    const lowerText = (text || '').toLowerCase();
+    let bestCategory = 'Miscellaneous';
+    let bestScore = 0;
+
+    for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+        const score = keywords.filter(kw => lowerText.includes(kw)).length;
+        if (score > bestScore) {
+            bestScore = score;
+            bestCategory = category;
+        }
+    }
+
+    return bestCategory;
 }
 
-.deck-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-    margin-top: 15px;
+async function generateCard(articleData = null) {
+    if (!articleData) {
+        const randomArticle = await fetchRandomArticle();
+        if (!randomArticle) return null;
+
+        articleData = await fetchArticleDetails(randomArticle.title);
+        if (!articleData) return null;
+    }
+
+    const rarity = determineRarity(articleData.length);
+    const stats = calculateStats(articleData, rarity);
+    const ability = generateAbility(articleData.extract, '');
+    const category = determineCategory(articleData.extract + ' ' + articleData.title);
+
+    const card = {
+        id: Date.now() + Math.random().toString(36).substring(2, 11),
+        name: articleData.title,
+        wikiTitle: articleData.title, // Store original title for Wikipedia link
+        description: articleData.extract?.substring(0, 150) + '...' || 'A mysterious Wikipedia article.',
+        image: articleData.image,
+        rarity: rarity,
+        attack: stats.attack,
+        defense: stats.defense,
+        knowledge: stats.knowledge,
+        cost: ENERGY_COSTS[rarity],
+        ability: ability,
+        category: category,
+        articleLength: articleData.length,
+        createdAt: Date.now()
+    };
+
+    return card;
 }
 
-.deck-grid .card {
-    width: 100%;
-    height: 140px;
+// ==========================================
+// Card Display
+// ==========================================
+
+function createCardElement(card, options = {}) {
+    const { small = false, clickable = true, inDeck = false, onField = false } = options;
+
+    const cardEl = document.createElement('div');
+    const isHolo = card.rarity === 'legendary' || card.rarity === 'epic';
+    cardEl.className = `card ${card.rarity} ${small ? 'small' : ''} ${onField ? 'on-field' : ''} ${isHolo ? 'holo-card' : ''}`;
+    cardEl.dataset.cardId = card.id;
+
+    const imageStyle = card.image
+        ? `background-image: url('${card.image}'); background-size: cover; background-position: center;`
+        : `background: linear-gradient(135deg, ${RARITY_THRESHOLDS[card.rarity].color}, #1a1a2e);`;
+
+    // Add holographic overlay for legendary/epic cards
+    const holoOverlay = isHolo ? '<div class="holo-overlay"></div><div class="holo-shine"></div>' : '';
+    const categoryBadge = card.category ? `<span class="category-badge">${card.category}</span>` : '';
+
+    cardEl.innerHTML = `
+        <div class="card-inner">
+            ${holoOverlay}
+            <div class="card-image" style="${imageStyle}"></div>
+            <span class="rarity-badge ${card.rarity}">${card.rarity}</span>
+            ${categoryBadge}
+            <span class="card-cost">${card.cost}</span>
+            <div class="card-content">
+                <div class="card-name" title="${card.name}">${card.name}</div>
+                <div class="card-description">${small ? '' : card.description}</div>
+                <div class="card-ability">${card.ability.name}</div>
+                <div class="card-stats">
+                    <span class="stat">⚔️ ${card.attack}</span>
+                    <span class="stat">🛡️ ${card.defense}</span>
+                    <span class="stat">📚 ${card.knowledge}</span>
+                </div>
+            </div>
+        </div>
+    `;
+
+    if (clickable) {
+        cardEl.addEventListener('click', () => handleCardClick(card, options));
+    }
+
+    return cardEl;
 }
 
-.available-cards {
-    background: var(--bg-card);
-    border-radius: 15px;
-    padding: 20px;
-    overflow-y: auto;
+function handleCardClick(card, options) {
+    if (options.inDeck) {
+        removeFromDeck(card);
+    } else if (options.inCollection) {
+        addToDeck(card);
+    } else if (options.inHand && gameState.currentBattle) {
+        playCard(card);
+    } else if (options.onField && gameState.currentBattle) {
+        selectCardForAttack(card);
+    } else {
+        showCardModal(card);
+    }
 }
 
-.save-deck-btn {
-    width: 100%;
-    margin-top: 15px;
+function showCardModal(card) {
+    const modal = document.getElementById('card-modal');
+    const display = document.getElementById('modal-card-display');
+    const info = document.getElementById('modal-card-info');
+
+    display.innerHTML = '';
+    display.appendChild(createCardElement(card, { clickable: false }));
+
+    // Create Wikipedia URL from title
+    const wikiTitle = card.wikiTitle || card.name;
+    const wikiUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(wikiTitle.replace(/ /g, '_'))}`;
+
+    info.innerHTML = `
+        <h3>${card.name}</h3>
+        <p><strong>Rarity:</strong> ${card.rarity.toUpperCase()}</p>
+        <p><strong>Article Length:</strong> ${card.articleLength?.toLocaleString() || 'Unknown'} characters</p>
+        <p>${card.description}</p>
+        <div class="ability-detail">
+            <strong>${card.ability.name}</strong>
+            <p>${card.ability.effect}</p>
+        </div>
+        <a href="${wikiUrl}" target="_blank" rel="noopener noreferrer" class="wiki-link-btn">
+            📖 View on Wikipedia
+        </a>
+    `;
+
+    modal.classList.remove('hidden');
 }
 
-/* Battle Modes */
-.battle-modes {
-    display: flex;
-    justify-content: center;
-    gap: 30px;
-    padding: 40px;
-    flex-wrap: wrap;
+function closeModal() {
+    document.getElementById('card-modal').classList.add('hidden');
 }
 
-.mode-card {
-    background: var(--bg-card);
-    border-radius: 15px;
-    padding: 40px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    min-width: 200px;
+// ==========================================
+// Pack Opening System (Premium Animation)
+// ==========================================
+
+// Pack opening state
+const packState = {
+    isOpening: false,
+    currentPackType: null,
+    cardsToReveal: [],
+    currentCardIndex: 0,
+    phase: 'idle' // idle, shake, burst, reveal, final
+};
+
+async function openPack(packType) {
+    if (packState.isOpening || videoAdState.isPlaying) return;
+
+    // Check if player has free tickets
+    if (gameState.tickets > 0) {
+        gameState.tickets--;
+        updateUI();
+        actuallyOpenPack();
+    } else {
+        // Show video ad
+        showVideoAd(packType);
+    }
 }
 
-.mode-card:hover {
-    transform: translateY(-10px);
-    box-shadow: 0 20px 40px rgba(74, 144, 217, 0.3);
-    border: 2px solid var(--accent-primary);
+async function actuallyOpenPack() {
+    packState.isOpening = true;
+
+    // Increment pack counters
+    gameState.packsOpened++;
+    gameState.totalPacksOpened++;
+    const isGoldenPack = gameState.packsOpened % 10 === 0;
+
+    packState.currentPackType = isGoldenPack ? 'golden' : 'standard';
+
+    // Update golden pack progress immediately
+    updateGoldenPackProgress();
+    saveGameState();
+
+    // Check achievements
+    checkAchievements();
+
+    // Start animation IMMEDIATELY - cards load in background
+    packState.cardsToReveal = null; // Will be loaded
+    packState.currentCardIndex = 0;
+    startPremiumPackAnimation(packState.currentPackType, isGoldenPack);
 }
 
-.mode-icon {
-    font-size: 4rem;
-    display: block;
-    margin-bottom: 15px;
+function updateGoldenPackProgress() {
+    const packsUntilGolden = 10 - (gameState.packsOpened % 10);
+    const progress = ((gameState.packsOpened % 10) / 10) * 100;
+
+    const progressText = document.getElementById('packs-until-golden');
+    const progressBar = document.getElementById('golden-bar-fill');
+    const packVisual = document.getElementById('pack-visual');
+    const packIcon = document.getElementById('pack-icon');
+    const packTitle = document.getElementById('pack-title');
+    const packOdds = document.getElementById('pack-odds');
+
+    if (progressText) progressText.textContent = packsUntilGolden === 10 ? 10 : packsUntilGolden;
+    if (progressBar) progressBar.style.width = `${progress}%`;
+
+    // Update pack appearance if next pack is golden
+    if (packsUntilGolden === 10 && gameState.packsOpened > 0) {
+        // Just opened a golden pack, reset to standard look
+        if (packVisual) packVisual.className = 'pack-visual standard-pack';
+        if (packIcon) packIcon.textContent = '📦';
+        if (packTitle) packTitle.textContent = 'Standard Pack';
+        if (packOdds) packOdds.textContent = '3 Common, 1+ Uncommon';
+    } else if (packsUntilGolden === 1) {
+        // Next pack is golden!
+        if (packVisual) packVisual.className = 'pack-visual golden-pack';
+        if (packIcon) packIcon.textContent = '👑';
+        if (packTitle) packTitle.textContent = '✨ GOLDEN PACK ✨';
+        if (packOdds) packOdds.textContent = 'Guaranteed Rare+, Higher Epic/Legendary!';
+    }
 }
 
-.mode-card.disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    pointer-events: none;
+async function openStandardPack(isGolden) {
+    const cards = [];
+    const totalCards = 5;
+
+    for (let i = 0; i < totalCards; i++) {
+        let card = null;
+        let attempts = 0;
+        const maxAttempts = 5;
+
+        while (!card && attempts < maxAttempts) {
+            card = await generateCard();
+
+            if (isGolden && card) {
+                // GOLDEN PACK: Much better odds!
+                const roll = Math.random();
+                if (i === 4) {
+                    // Last card: guaranteed epic or legendary
+                    if (roll < 0.4) {
+                        card.rarity = 'legendary';
+                        card.cost = ENERGY_COSTS.legendary;
+                        card.attack += 4;
+                        card.defense += 3;
+                    } else {
+                        card.rarity = 'epic';
+                        card.cost = ENERGY_COSTS.epic;
+                        card.attack += 2;
+                        card.defense += 2;
+                    }
+                } else {
+                    // Other cards: at least rare
+                    if (card.rarity === 'common' || card.rarity === 'uncommon') {
+                        if (roll < 0.3) {
+                            card.rarity = 'epic';
+                            card.cost = ENERGY_COSTS.epic;
+                            card.attack += 2;
+                            card.defense += 1;
+                        } else {
+                            card.rarity = 'rare';
+                            card.cost = ENERGY_COSTS.rare;
+                            card.attack += 1;
+                        }
+                    }
+                }
+            } else if (i === 3 && card && card.rarity === 'common') {
+                // Standard pack: 4th card guaranteed uncommon+
+                card.rarity = 'uncommon';
+                card.cost = ENERGY_COSTS.uncommon;
+            }
+            attempts++;
+        }
+
+        if (card) cards.push(card);
+    }
+
+    return cards;
 }
 
-.mode-card .coming-soon {
-    color: var(--legendary);
-    font-weight: bold;
-    font-style: italic;
+async function openTrendingPack() {
+    const trending = await fetchTrendingArticles();
+    const cards = [];
+    const shuffled = trending.sort(() => Math.random() - 0.5).slice(0, 5);
+
+    for (const article of shuffled) {
+        const details = await fetchArticleDetails(article.article);
+        if (details) {
+            const card = await generateCard(details);
+            if (card) cards.push(card);
+        }
+    }
+
+    while (cards.length < 5) {
+        const card = await generateCard();
+        if (card) cards.push(card);
+    }
+
+    return cards;
 }
 
-/* Boss Battle Styles */
-.boss-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 20px;
-    padding: 20px;
-    max-width: 1200px;
-    margin: 0 auto;
+// Premium Pack Opening Animation
+function startPremiumPackAnimation(packType, isGolden) {
+    // Start loading cards in background immediately
+    let cardsPromise = openStandardPack(isGolden);
+    let loadedCards = null;
+
+    cardsPromise.then(cards => {
+        loadedCards = cards;
+        packState.cardsToReveal = cards;
+    }).catch(err => {
+        console.error('Error loading cards:', err);
+        loadedCards = [];
+    });
+
+    // Create overlay IMMEDIATELY
+    const overlay = document.createElement('div');
+    overlay.className = 'pack-opening-overlay';
+    overlay.id = 'premium-pack-overlay';
+
+    // Particles container
+    const particlesContainer = document.createElement('div');
+    particlesContainer.className = 'particles-container';
+    overlay.appendChild(particlesContainer);
+
+    // Pack wrapper
+    const packWrapper = document.createElement('div');
+    packWrapper.className = 'pack-wrapper';
+
+    // 3D Pack
+    const pack3d = document.createElement('div');
+    pack3d.className = 'pack-3d-premium pack-idle';
+
+    const packFront = document.createElement('div');
+    packFront.className = `pack-face-premium pack-front-premium ${packType}`;
+
+    const packIcon = { standard: '📦', premium: '✨', trending: '🔥', golden: '👑' };
+    const packName = { standard: 'Standard Pack', premium: 'Premium Pack', trending: 'Trending Pack', golden: '✨ GOLDEN PACK ✨' };
+
+    packFront.innerHTML = `
+        <div class="pack-shine"></div>
+        <span class="pack-logo">${packIcon[packType] || '📦'}</span>
+        <span class="pack-title">${packName[packType] || 'Pack'}</span>
+    `;
+
+    pack3d.appendChild(packFront);
+    packWrapper.appendChild(pack3d);
+    overlay.appendChild(packWrapper);
+
+    // Instruction text
+    const instruction = document.createElement('p');
+    instruction.className = 'pack-instruction';
+    instruction.textContent = 'Click the pack to open!';
+    overlay.appendChild(instruction);
+
+    document.body.appendChild(overlay);
+
+    // Single click to open - instant feel!
+    packWrapper.onclick = async () => {
+        packWrapper.onclick = null; // Prevent double clicks
+
+        // Quick shake animation
+        pack3d.classList.remove('pack-idle');
+        pack3d.classList.add('pack-shake');
+        instruction.textContent = 'Opening...';
+
+        // After brief shake, burst open
+        setTimeout(async () => {
+            pack3d.classList.remove('pack-shake');
+            pack3d.classList.add('pack-burst');
+            instruction.style.display = 'none';
+
+            // Create burst particles
+            createBurstParticles(particlesContainer, packType);
+
+            setTimeout(async () => {
+                packWrapper.style.display = 'none';
+
+                // Wait for cards if not loaded yet
+                if (!loadedCards) {
+                    instruction.style.display = 'block';
+                    instruction.textContent = 'Loading cards...';
+                    try {
+                        loadedCards = await cardsPromise;
+                    } catch (e) {
+                        loadedCards = [];
+                    }
+                    instruction.style.display = 'none';
+                }
+
+                startCardRevealSequence(overlay, loadedCards);
+            }, 300);
+        }, 200);
+    };
 }
 
-.boss-card {
-    background: linear-gradient(135deg, #2c3e50, #1a1a2e);
-    border: 2px solid var(--legendary);
-    border-radius: 15px;
-    padding: 25px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
+function createBurstParticles(container, packType) {
+    const colors = {
+        standard: ['#3a7bd5', '#5a9bff', '#ffffff'],
+        premium: ['#9b59b6', '#bb8fce', '#ffffff', '#ffd700'],
+        trending: ['#e74c3c', '#f39c12', '#ffffff'],
+        golden: ['#ffd700', '#ffed4a', '#ffffff', '#ffc107', '#ff9800']
+    };
+
+    const particleColors = colors[packType] || colors.standard;
+
+    for (let i = 0; i < 50; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+
+        const color = particleColors[Math.floor(Math.random() * particleColors.length)];
+        const angle = (Math.PI * 2 * i) / 50;
+        const velocity = 100 + Math.random() * 200;
+        const size = 4 + Math.random() * 8;
+
+        particle.style.cssText = `
+            width: ${size}px;
+            height: ${size}px;
+            background: ${color};
+            box-shadow: 0 0 ${size}px ${color};
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        `;
+
+        container.appendChild(particle);
+
+        // Animate particle
+        const duration = 800 + Math.random() * 400;
+        particle.animate([
+            {
+                transform: 'translate(-50%, -50%) scale(1)',
+                opacity: 1
+            },
+            {
+                transform: `translate(
+                    calc(-50% + ${Math.cos(angle) * velocity}px),
+                    calc(-50% + ${Math.sin(angle) * velocity}px)
+                ) scale(0)`,
+                opacity: 0
+            }
+        ], {
+            duration: duration,
+            easing: 'cubic-bezier(0, 0.5, 0.5, 1)',
+            fill: 'forwards'
+        });
+
+        setTimeout(() => particle.remove(), duration);
+    }
 }
 
-.boss-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 30px rgba(255, 152, 0, 0.4);
+function startCardRevealSequence(overlay, cards) {
+    // Clear and set up for card reveal
+    const existingContent = overlay.querySelectorAll('.pack-wrapper, .particles-container');
+    existingContent.forEach(el => el.remove());
+
+    // Counter
+    const counter = document.createElement('div');
+    counter.className = 'reveal-counter';
+    counter.textContent = `Card 1 of ${cards.length}`;
+    overlay.appendChild(counter);
+
+    // Cards stack area
+    const cardsStack = document.createElement('div');
+    cardsStack.className = 'cards-stack';
+    overlay.appendChild(cardsStack);
+
+    // Instruction
+    const instruction = document.createElement('p');
+    instruction.className = 'pack-instruction';
+    instruction.textContent = 'Click to reveal card!';
+    overlay.appendChild(instruction);
+
+    packState.currentCardIndex = 0;
+    showNextCard(overlay, cardsStack, counter, instruction, cards);
 }
 
-.boss-card h3 {
-    color: var(--legendary);
-    margin-bottom: 10px;
+function showNextCard(overlay, cardsStack, counter, instruction, cards) {
+    if (packState.currentCardIndex >= cards.length) {
+        showFinalCardsDisplay(overlay, cards);
+        return;
+    }
+
+    const card = cards[packState.currentCardIndex];
+    counter.textContent = `Card ${packState.currentCardIndex + 1} of ${cards.length}`;
+
+    // Clear previous card
+    cardsStack.innerHTML = '';
+
+    // Create 3D card
+    const cardWrapper = document.createElement('div');
+    cardWrapper.className = 'card-reveal-wrapper card-slide-in';
+
+    const card3d = document.createElement('div');
+    card3d.className = 'card-3d';
+
+    // Back face
+    const backFace = document.createElement('div');
+    backFace.className = 'card-face card-back-face';
+    backFace.innerHTML = `
+        <div class="card-back-pattern">
+            <span>?</span>
+        </div>
+    `;
+
+    // Front face
+    const frontFace = document.createElement('div');
+    frontFace.className = 'card-face card-front-face';
+    const cardEl = createCardElement(card, { clickable: false });
+    frontFace.appendChild(cardEl);
+
+    card3d.appendChild(backFace);
+    card3d.appendChild(frontFace);
+    cardWrapper.appendChild(card3d);
+    cardsStack.appendChild(cardWrapper);
+
+    // Click to flip
+    cardWrapper.onclick = () => {
+        if (card3d.classList.contains('flipped')) return;
+
+        card3d.classList.add('flipped');
+        cardWrapper.onclick = null;
+
+        // Apply rarity effect after flip (reduced delays)
+        setTimeout(() => {
+            cardEl.classList.add(`reveal-${card.rarity}`);
+
+            // Special effects for epic/legendary
+            if (card.rarity === 'epic' || card.rarity === 'legendary') {
+                const particlesContainer = overlay.querySelector('.particles-container') ||
+                    (() => {
+                        const pc = document.createElement('div');
+                        pc.className = 'particles-container';
+                        overlay.appendChild(pc);
+                        return pc;
+                    })();
+
+                if (card.rarity === 'legendary') {
+                    const flash = document.createElement('div');
+                    flash.className = 'screen-flash';
+                    document.body.appendChild(flash);
+                    setTimeout(() => flash.remove(), 200);
+                    createBurstParticles(particlesContainer, 'premium');
+                } else {
+                    createBurstParticles(particlesContainer, 'standard');
+                }
+            }
+
+            // Add to collection
+            gameState.cards.push(card);
+            saveGameState();
+
+            // Next card - immediate click available
+            instruction.textContent = packState.currentCardIndex < cards.length - 1
+                ? 'Click for next card!'
+                : 'Click to finish!';
+
+            // Allow immediate click for next card
+            setTimeout(() => {
+                cardWrapper.onclick = () => {
+                    packState.currentCardIndex++;
+                    showNextCard(overlay, cardsStack, counter, instruction, cards);
+                };
+            }, 200); // Reduced from 500
+        }, 250); // Reduced from 400
+    };
 }
 
-.boss-intro {
-    text-align: center;
-    color: var(--text-secondary);
-    margin-bottom: 20px;
+function showFinalCardsDisplay(overlay, cards) {
+    overlay.innerHTML = '';
+
+    const title = document.createElement('h2');
+    title.textContent = 'Cards Collected!';
+    title.style.cssText = 'margin-bottom: 30px; font-size: 2rem; color: var(--gold);';
+    overlay.appendChild(title);
+
+    const finalDisplay = document.createElement('div');
+    finalDisplay.className = 'final-cards-display';
+
+    cards.forEach((card, index) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'final-card-wrapper';
+        wrapper.style.setProperty('--delay', `${index * 0.1}s`);
+
+        const cardEl = createCardElement(card, { clickable: false });
+        wrapper.appendChild(cardEl);
+        finalDisplay.appendChild(wrapper);
+    });
+
+    overlay.appendChild(finalDisplay);
+
+    const collectBtn = document.createElement('button');
+    collectBtn.className = 'menu-btn';
+    collectBtn.textContent = 'Collect All';
+    collectBtn.style.marginTop = '30px';
+    collectBtn.onclick = () => {
+        overlay.remove();
+        packState.isOpening = false;
+        packState.cardsToReveal = [];
+        packState.currentCardIndex = 0;
+        updateUI();
+    };
+    overlay.appendChild(collectBtn);
 }
 
-.boss-battle-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 20px;
-    height: calc(100vh - 100px);
-    justify-content: space-between;
+function closePackReveal() {
+    const overlay = document.getElementById('premium-pack-overlay');
+    if (overlay) overlay.remove();
+
+    document.getElementById('cards-reveal').classList.add('hidden');
+    packState.isOpening = false;
+    updateUI();
 }
 
-.boss-area {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 15px;
+// ==========================================
+// Collection & Deck Building
+// ==========================================
+
+function filterCollection() {
+    const rarityFilter = document.getElementById('rarity-filter').value;
+    const sortFilter = document.getElementById('sort-filter').value;
+
+    let filteredCards = [...gameState.cards];
+
+    // Filter by rarity
+    if (rarityFilter !== 'all') {
+        filteredCards = filteredCards.filter(c => c.rarity === rarityFilter);
+    }
+
+    // Sort
+    switch (sortFilter) {
+        case 'newest':
+            filteredCards.sort((a, b) => b.createdAt - a.createdAt);
+            break;
+        case 'rarity':
+            const rarityOrder = { legendary: 5, epic: 4, rare: 3, uncommon: 2, common: 1 };
+            filteredCards.sort((a, b) => rarityOrder[b.rarity] - rarityOrder[a.rarity]);
+            break;
+        case 'attack':
+            filteredCards.sort((a, b) => b.attack - a.attack);
+            break;
+        case 'defense':
+            filteredCards.sort((a, b) => b.defense - a.defense);
+            break;
+        case 'knowledge':
+            filteredCards.sort((a, b) => b.knowledge - a.knowledge);
+            break;
+    }
+
+    renderCollection(filteredCards);
 }
 
-.boss-card-large {
-    background: linear-gradient(135deg, var(--legendary), #c0392b);
-    border-radius: 20px;
-    overflow: hidden;
-    width: 300px;
-    box-shadow: 0 10px 40px rgba(255, 152, 0, 0.5);
+function renderCollection(cards = null) {
+    const grid = document.getElementById('collection-grid');
+    const cardsToRender = cards || gameState.cards;
+
+    grid.innerHTML = '';
+
+    if (cardsToRender.length === 0) {
+        grid.innerHTML = '<p style="text-align: center; color: var(--text-secondary); grid-column: 1/-1;">No cards yet! Open some packs to start your collection.</p>';
+        return;
+    }
+
+    cardsToRender.forEach(card => {
+        grid.appendChild(createCardElement(card));
+    });
 }
 
-.boss-health-container {
-    width: 300px;
-    text-align: center;
+function renderDeckBuilder() {
+    const deckCards = document.getElementById('deck-cards');
+    const availableGrid = document.getElementById('available-cards-grid');
+
+    // Render current deck
+    deckCards.innerHTML = '';
+    gameState.deck.forEach(card => {
+        const cardEl = createCardElement(card, { small: true, inDeck: true });
+        deckCards.appendChild(cardEl);
+    });
+
+    // Update deck count
+    document.getElementById('deck-count').textContent = gameState.deck.length;
+
+    // Render available cards (not in deck)
+    availableGrid.innerHTML = '';
+    const deckIds = gameState.deck.map(c => c.id);
+    const availableCards = gameState.cards.filter(c => !deckIds.includes(c.id));
+
+    availableCards.forEach(card => {
+        const cardEl = createCardElement(card, { small: true, inCollection: true });
+        availableGrid.appendChild(cardEl);
+    });
 }
 
-.boss-health-bar {
-    width: 100%;
-    height: 30px;
-    background: var(--bg-dark);
-    border-radius: 15px;
-    overflow: hidden;
-    margin-bottom: 5px;
+function addToDeck(card) {
+    if (gameState.deck.length >= 20) {
+        alert('Deck is full! (20 cards max)');
+        return;
+    }
+
+    if (gameState.deck.find(c => c.id === card.id)) {
+        alert('Card already in deck!');
+        return;
+    }
+
+    gameState.deck.push(card);
+    renderDeckBuilder();
+    saveGameState();
 }
 
-.health-fill.boss {
-    background: linear-gradient(90deg, #e74c3c, #c0392b);
+function removeFromDeck(card) {
+    gameState.deck = gameState.deck.filter(c => c.id !== card.id);
+    renderDeckBuilder();
+    saveGameState();
 }
 
-.boss-ability {
-    color: var(--text-secondary);
-    font-style: italic;
-    font-size: 0.9rem;
-    max-width: 400px;
-    text-align: center;
+function saveDeck() {
+    if (gameState.deck.length < 5) {
+        alert('You need at least 5 cards in your deck!');
+        return;
+    }
+    saveGameState();
+    alert('Deck saved!');
 }
 
-.boss-battle-controls {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 15px;
-    width: 100%;
+// ==========================================
+// Battle System (Enhanced)
+// ==========================================
+
+// Battle state
+const battleState = {
+    selectedAttacker: null,
+    isAnimating: false,
+    actionQueue: []
+};
+
+// AI opponent card names for variety
+const AI_CARD_NAMES = [
+    'Shadow Scholar', 'Data Phantom', 'Binary Beast', 'Logic Lord',
+    'Syntax Specter', 'Algorithm Knight', 'Cache Crawler', 'Byte Bandit',
+    'Protocol Paladin', 'Cipher Sentinel', 'Debug Dragon', 'Memory Mage'
+];
+
+function startBattle(mode) {
+    if (gameState.deck.length < 5) {
+        alert('You need at least 5 cards in your deck to battle!');
+        showScreen('deck-builder');
+        return;
+    }
+
+    // Initialize battle state
+    gameState.currentBattle = {
+        mode: mode,
+        turn: 'player',
+        turnNumber: 1,
+        maxEnergy: 10
+    };
+
+    gameState.playerHealth = 30;
+    gameState.opponentHealth = 30;
+    gameState.playerEnergy = 1;
+    gameState.opponentEnergy = 1;
+    gameState.playerField = [];
+    gameState.opponentField = [];
+
+    // Create shuffled deck copy for drawing
+    gameState.playerDeck = shuffleArray([...gameState.deck]);
+
+    // Draw initial hands
+    gameState.playerHand = gameState.playerDeck.splice(0, 4);
+    gameState.opponentHand = generateOpponentHand(4);
+
+    battleState.selectedAttacker = null;
+    battleState.isAnimating = false;
+
+    showScreen('battle-arena');
+    renderBattle();
+
+    // Show turn indicator
+    showTurnIndicator('player');
+    addBattleLog('⚔️ Battle started! Your turn.');
 }
 
-.boss-player-info {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    padding: 15px 30px;
-    background: var(--bg-card);
-    border-radius: 15px;
+function generateOpponentHand(count) {
+    const cards = [];
+    const rarities = ['common', 'common', 'common', 'uncommon', 'uncommon', 'rare'];
+
+    for (let i = 0; i < count; i++) {
+        const rarity = rarities[Math.floor(Math.random() * rarities.length)];
+        const name = AI_CARD_NAMES[Math.floor(Math.random() * AI_CARD_NAMES.length)];
+        const bonus = RARITY_STAT_BONUSES[rarity] || RARITY_STAT_BONUSES.common;
+
+        // Generate stats based on rarity (same system as player cards)
+        const attack = bonus.minAttack + Math.floor(Math.random() * (bonus.maxAttack - bonus.minAttack + 1));
+        const defense = Math.floor(bonus.defense * 0.8) + Math.floor(Math.random() * 3) + 1;
+        const knowledge = Math.floor(bonus.knowledge * 0.8) + Math.floor(Math.random() * 2) + 1;
+
+        cards.push({
+            id: 'opp-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+            name: name,
+            attack: attack,
+            defense: defense,
+            knowledge: knowledge,
+            cost: ENERGY_COSTS[rarity],
+            rarity: rarity,
+            ability: { name: 'AI Protocol', effect: 'Standard combat', type: 'default' }
+        });
+    }
+
+    return cards;
 }
 
-/* Battle Arena */
-.battle-container {
-    display: flex;
-    flex-direction: column;
-    height: calc(100vh - 80px);
-    padding: 20px;
+function showTurnIndicator(turn) {
+    const existing = document.querySelector('.turn-indicator');
+    if (existing) existing.remove();
+
+    const indicator = document.createElement('div');
+    indicator.className = `turn-indicator ${turn}-turn`;
+    indicator.textContent = turn === 'player' ? 'Your Turn' : 'Enemy Turn';
+    document.body.appendChild(indicator);
+
+    setTimeout(() => indicator.remove(), 1500);
 }
 
-.opponent-area, .player-area {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+function renderBattle() {
+    // Update health bars with animation
+    updateHealthBar('player', gameState.playerHealth, 30);
+    updateHealthBar('opponent', gameState.opponentHealth, 30);
+
+    // Update energy display
+    renderEnergyDisplay('player', gameState.playerEnergy, gameState.currentBattle.maxEnergy);
+    renderEnergyDisplay('opponent', gameState.opponentEnergy, gameState.currentBattle.maxEnergy);
+
+    // Render player hand
+    renderPlayerHand();
+
+    // Render opponent hand (face down)
+    renderOpponentHand();
+
+    // Render fields
+    renderField('player');
+    renderField('opponent');
+
+    // Update end turn button state
+    updateEndTurnButton();
+
+    // Update phase indicator and action hint
+    updateBattlePhase();
 }
 
-.player-info {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    padding: 10px 20px;
-    background: var(--bg-card);
-    border-radius: 10px;
-    margin: 10px 0;
+function updateBattlePhase() {
+    const phaseIndicator = document.getElementById('phase-indicator');
+    const phaseText = document.getElementById('phase-text');
+    const hintText = document.getElementById('hint-text');
+
+    if (!phaseIndicator || !phaseText || !hintText) return;
+
+    if (gameState.currentBattle.turn === 'player') {
+        phaseIndicator.classList.remove('opponent-phase');
+        phaseText.textContent = '🎮 Your Turn';
+
+        // Dynamic hints based on game state
+        const canPlayCards = gameState.playerHand.some(c => c.cost <= gameState.playerEnergy);
+        const canAttack = gameState.playerField.some(c => c.canAttack && !c.hasAttacked);
+        const hasFieldCards = gameState.playerField.length > 0;
+
+        if (battleState.selectedAttacker) {
+            if (gameState.opponentField.length > 0) {
+                hintText.textContent = '🎯 Click an enemy card to attack it!';
+            } else {
+                hintText.textContent = '🎯 Click the enemy field to attack directly!';
+            }
+        } else if (canAttack && hasFieldCards) {
+            hintText.textContent = '⚔️ Click your glowing cards to attack, or play more cards';
+        } else if (canPlayCards) {
+            hintText.textContent = '🃏 Click cards in your hand to play them';
+        } else if (hasFieldCards) {
+            hintText.textContent = '⏭️ Your cards are resting. Click End Turn to continue';
+        } else {
+            hintText.textContent = '⚡ Not enough energy. Click End Turn';
+        }
+    } else {
+        phaseIndicator.classList.add('opponent-phase');
+        phaseText.textContent = '🤖 Enemy Turn';
+        hintText.textContent = '⏳ Wait for opponent to finish...';
+    }
 }
 
-.player-info.opponent {
-    background: linear-gradient(135deg, #2c3e50, #34495e);
+function toggleBattleHelp() {
+    const helpPanel = document.getElementById('battle-help');
+    if (helpPanel) {
+        helpPanel.classList.toggle('visible');
+    }
 }
 
-.health-bar {
-    width: 200px;
-    height: 25px;
-    background: var(--bg-dark);
-    border-radius: 12px;
-    overflow: hidden;
-    position: relative;
+function renderEnergyDisplay(player, current, max) {
+    const container = document.getElementById(`${player}-energy`);
+    if (container) {
+        container.textContent = `${current}/${max}`;
+    }
 }
 
-.health-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--health), #c0392b);
-    transition: width 0.5s ease;
-    width: 100%;
+function renderPlayerHand() {
+    const playerHandEl = document.getElementById('player-hand');
+    playerHandEl.innerHTML = '';
+
+    gameState.playerHand.forEach((card, index) => {
+        const cardEl = createCardElement(card, { small: true, inHand: true });
+
+        // Add playable indicator
+        if (gameState.currentBattle.turn === 'player' && gameState.playerEnergy >= card.cost) {
+            cardEl.classList.add('playable');
+            cardEl.title = 'Click to play this card';
+        } else if (gameState.playerEnergy < card.cost) {
+            cardEl.style.filter = 'brightness(0.7)';
+            cardEl.title = `Need ${card.cost} energy (have ${gameState.playerEnergy})`;
+        }
+
+        cardEl.style.animationDelay = `${index * 0.05}s`;
+        playerHandEl.appendChild(cardEl);
+    });
 }
 
-.health-bar span {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 0.85rem;
-    font-weight: bold;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+function renderOpponentHand() {
+    const oppHandEl = document.getElementById('opponent-hand');
+    oppHandEl.innerHTML = '';
+
+    gameState.opponentHand.forEach((_, index) => {
+        const cardBack = document.createElement('div');
+        cardBack.className = 'card opponent-card-back';
+        cardBack.innerHTML = '<div class="card-back-design">?</div>';
+        cardBack.style.animationDelay = `${index * 0.05}s`;
+        oppHandEl.appendChild(cardBack);
+    });
 }
 
-.card-field {
-    display: flex;
-    justify-content: center;
-    gap: 15px;
-    padding: 20px;
-    min-height: 150px;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 10px;
-    width: 100%;
-    max-width: 800px;
+function renderField(player) {
+    const field = document.getElementById(`${player}-field`);
+    const cards = player === 'player' ? gameState.playerField : gameState.opponentField;
+
+    field.innerHTML = '';
+    field.className = `card-field ${player}-field`;
+
+    cards.forEach(card => {
+        const cardEl = createBattleCard(card, player);
+        field.appendChild(cardEl);
+    });
+
+    // Add direct attack target if applicable
+    if (player === 'opponent' && battleState.selectedAttacker && gameState.opponentField.length === 0) {
+        field.classList.add('targetable');
+        field.onclick = () => executeDirectAttack(battleState.selectedAttacker);
+    } else {
+        field.classList.remove('targetable');
+        field.onclick = null;
+    }
 }
 
-.card-field .card {
-    width: 120px;
-    height: 170px;
+function createBattleCard(card, owner) {
+    const cardEl = document.createElement('div');
+    cardEl.className = `card ${card.rarity} battle-card`;
+    cardEl.dataset.cardId = card.id;
+
+    // Selected attacker styling
+    if (battleState.selectedAttacker && battleState.selectedAttacker.id === card.id) {
+        cardEl.classList.add('selected-attacker');
+    }
+
+    // Can attack styling
+    if (card.canAttack && !card.hasAttacked && owner === 'player' && gameState.currentBattle.turn === 'player') {
+        cardEl.classList.add('can-attack');
+    }
+
+    // Has attacked styling
+    if (card.hasAttacked) {
+        cardEl.classList.add('exhausted');
+        cardEl.style.filter = 'brightness(0.6) grayscale(30%)';
+    }
+
+    // Valid target styling
+    if (battleState.selectedAttacker && owner === 'opponent') {
+        cardEl.classList.add('valid-target');
+    }
+
+    const imageStyle = card.image
+        ? `background-image: url('${card.image}'); background-size: cover; background-position: center;`
+        : `background: linear-gradient(135deg, ${RARITY_THRESHOLDS[card.rarity].color}40, #1a1a2e);`;
+
+    cardEl.innerHTML = `
+        <div class="card-inner">
+            <div class="card-image" style="${imageStyle}"></div>
+            <span class="card-cost">${card.cost}</span>
+            <div class="card-content">
+                <div class="card-name">${card.name}</div>
+                <div class="card-stats">
+                    <span class="stat">⚔️ ${card.attack}</span>
+                    <span class="stat">🛡️ ${card.currentHealth}/${card.defense}</span>
+                </div>
+            </div>
+            <div class="card-health">${card.currentHealth}</div>
+        </div>
+    `;
+
+    // Click handlers
+    if (owner === 'player' && gameState.currentBattle.turn === 'player') {
+        cardEl.onclick = () => handlePlayerFieldCardClick(card);
+    } else if (owner === 'opponent' && battleState.selectedAttacker) {
+        cardEl.onclick = () => executeAttack(battleState.selectedAttacker, card);
+    }
+
+    return cardEl;
 }
 
-.card-hand {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    padding: 10px;
+function handlePlayerFieldCardClick(card) {
+    if (battleState.isAnimating) return;
+
+    if (!card.canAttack || card.hasAttacked) {
+        addBattleLog(`${card.name} cannot attack right now.`);
+        return;
+    }
+
+    // Toggle selection
+    if (battleState.selectedAttacker && battleState.selectedAttacker.id === card.id) {
+        battleState.selectedAttacker = null;
+        addBattleLog('Attack cancelled.');
+    } else {
+        battleState.selectedAttacker = card;
+
+        if (gameState.opponentField.length > 0) {
+            addBattleLog(`🎯 ${card.name} selected! Click an enemy card to attack.`);
+        } else {
+            addBattleLog(`🎯 ${card.name} selected! Click enemy area to attack directly!`);
+        }
+    }
+
+    renderBattle();
 }
 
-.card-hand .card {
-    width: 100px;
-    height: 150px;
-    transition: all 0.3s ease;
+function updateHealthBar(player, current, max) {
+    const bar = document.getElementById(`${player}-health-bar`);
+    const text = document.getElementById(`${player}-health`);
+
+    const percentage = Math.max(0, (current / max) * 100);
+    bar.style.width = `${percentage}%`;
+
+    // Color based on health
+    if (percentage <= 25) {
+        bar.style.background = 'linear-gradient(90deg, #ff0000, #cc0000)';
+    } else if (percentage <= 50) {
+        bar.style.background = 'linear-gradient(90deg, #ff6600, #cc5500)';
+    } else {
+        bar.style.background = 'linear-gradient(90deg, var(--health), #c0392b)';
+    }
+
+    text.textContent = Math.max(0, current);
 }
 
-.card-hand .card:hover {
-    transform: translateY(-20px) scale(1.1);
+function updateEndTurnButton() {
+    const btn = document.getElementById('end-turn-btn');
+    if (gameState.currentBattle.turn === 'player' && !battleState.isAnimating) {
+        btn.disabled = false;
+        btn.classList.add('active');
+    } else {
+        btn.disabled = true;
+        btn.classList.remove('active');
+    }
 }
 
-.opponent-hand .card {
-    background: linear-gradient(135deg, #2c3e50, #34495e);
+// Card Playing
+function playCard(card) {
+    if (battleState.isAnimating) return;
+
+    if (gameState.currentBattle.turn !== 'player') {
+        addBattleLog('⏳ Wait for your turn!');
+        return;
+    }
+
+    if (gameState.playerEnergy < card.cost) {
+        addBattleLog(`⚡ Not enough energy! Need ${card.cost}, have ${gameState.playerEnergy}`);
+        return;
+    }
+
+    if (gameState.playerField.length >= 4) {
+        addBattleLog('📋 Field is full! (4 cards max)');
+        return;
+    }
+
+    battleState.isAnimating = true;
+
+    // Deduct energy and remove from hand
+    gameState.playerEnergy -= card.cost;
+    gameState.playerHand = gameState.playerHand.filter(c => c.id !== card.id);
+
+    // Create field card (can't attack on play turn)
+    const fieldCard = {
+        ...card,
+        canAttack: false,
+        hasAttacked: false,
+        currentHealth: card.defense
+    };
+    gameState.playerField.push(fieldCard);
+
+    addBattleLog(`📤 You played ${card.name}!`);
+
+    // Play animation
+    renderBattle();
+
+    setTimeout(() => {
+        applyPlayEffect(fieldCard);
+        battleState.isAnimating = false;
+        renderBattle();
+    }, 300);
 }
 
-.battle-info {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 30px;
-    padding: 10px;
+function applyPlayEffect(card) {
+    switch (card.ability?.type) {
+        case 'history':
+            if (gameState.opponentField.length > 0) {
+                const target = gameState.opponentField[0];
+                dealDamage(target, 3, 'opponent');
+                addBattleLog(`⚡ Historical Impact deals 3 damage to ${target.name}!`);
+            }
+            break;
+        case 'technology':
+            gameState.playerField.forEach(c => {
+                c.attack += 1;
+                c.currentHealth += 1;
+                c.defense += 1;
+            });
+            addBattleLog('🔧 Tech Boost: All cards gain +1/+1!');
+            break;
+        case 'art':
+            drawCard('player');
+            addBattleLog('🎨 Creative Inspiration: Drew a card!');
+            break;
+        case 'science':
+            gameState.playerEnergy = Math.min(gameState.currentBattle.maxEnergy, gameState.playerEnergy + 2);
+            addBattleLog('🔬 Scientific Breakthrough: +2 Energy!');
+            break;
+        case 'animal':
+            card.currentHealth += 2;
+            card.defense += 2;
+            addBattleLog(`🦁 Natural Defense: ${card.name} gains +2 defense!`);
+            break;
+    }
 }
 
-.battle-log {
-    background: var(--bg-card);
-    padding: 15px;
-    border-radius: 10px;
-    max-width: 400px;
-    height: 80px;
-    overflow-y: auto;
-    font-size: 0.85rem;
+// Combat System
+function executeAttack(attacker, defender) {
+    if (battleState.isAnimating) return;
+    if (!attacker || !defender) return;
+
+    battleState.isAnimating = true;
+    battleState.selectedAttacker = null;
+
+    // Calculate damage
+    let damage = attacker.attack;
+
+    // Ability modifiers
+    if (attacker.ability?.type === 'sport') {
+        damage += 2;
+        addBattleLog('💪 Athletic Power: +2 attack!');
+    }
+    if (defender.ability?.type === 'animal') {
+        damage = Math.max(1, damage - 2);
+        addBattleLog('🛡️ Natural Defense reduces damage!');
+    }
+
+    // Visual attack animation
+    const attackerEl = document.querySelector(`[data-card-id="${attacker.id}"]`);
+    const defenderEl = document.querySelector(`[data-card-id="${defender.id}"]`);
+
+    if (attackerEl) attackerEl.classList.add('card-attacking');
+
+    setTimeout(() => {
+        if (defenderEl) defenderEl.classList.add('card-attacked');
+
+        // Deal damage
+        dealDamage(defender, damage, 'opponent');
+        showDamageNumber(defenderEl, damage);
+
+        addBattleLog(`⚔️ ${attacker.name} attacks ${defender.name} for ${damage} damage!`);
+
+        // Counter attack (50% of defender's attack)
+        const counterDamage = Math.floor(defender.attack / 2);
+        if (counterDamage > 0 && defender.currentHealth > 0) {
+            dealDamage(attacker, counterDamage, 'player');
+            showDamageNumber(attackerEl, counterDamage);
+            addBattleLog(`↩️ ${defender.name} counters for ${counterDamage}!`);
+        }
+
+        attacker.hasAttacked = true;
+        attacker.canAttack = false;
+
+        setTimeout(() => {
+            attackerEl?.classList.remove('card-attacking');
+            defenderEl?.classList.remove('card-attacked');
+
+            checkAndRemoveDeadCards();
+            battleState.isAnimating = false;
+            renderBattle();
+        }, 400);
+    }, 300);
 }
 
-.forfeit-btn {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: var(--health);
-    border: none;
-    color: white;
-    padding: 10px 20px;
-    border-radius: 5px;
-    cursor: pointer;
+function executeDirectAttack(attacker) {
+    if (battleState.isAnimating) return;
+    if (!attacker || gameState.opponentField.length > 0) return;
+
+    battleState.isAnimating = true;
+    battleState.selectedAttacker = null;
+
+    const damage = attacker.attack;
+
+    const attackerEl = document.querySelector(`[data-card-id="${attacker.id}"]`);
+    if (attackerEl) attackerEl.classList.add('card-attacking');
+
+    setTimeout(() => {
+        gameState.opponentHealth -= damage;
+        addBattleLog(`💥 ${attacker.name} attacks opponent directly for ${damage} damage!`);
+
+        attacker.hasAttacked = true;
+        attacker.canAttack = false;
+
+        if (gameState.opponentHealth <= 0) {
+            setTimeout(() => endBattle(true), 500);
+        }
+
+        setTimeout(() => {
+            attackerEl?.classList.remove('card-attacking');
+            battleState.isAnimating = false;
+            renderBattle();
+        }, 400);
+    }, 300);
 }
 
-/* ==========================================
-   PREMIUM PACK OPENING ANIMATIONS
-   ========================================== */
+function dealDamage(card, amount, owner) {
+    card.currentHealth -= amount;
 
-.pack-opening-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a15 100%);
-    z-index: 1000;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
+    // Update health display
+    const cardEl = document.querySelector(`[data-card-id="${card.id}"] .card-health`);
+    if (cardEl) {
+        cardEl.textContent = card.currentHealth;
+        cardEl.classList.add('damaged');
+        setTimeout(() => cardEl.classList.remove('damaged'), 300);
+    }
 }
 
-/* Particle Container */
-.particles-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    overflow: hidden;
+function showDamageNumber(element, damage) {
+    if (!element) return;
+
+    const rect = element.getBoundingClientRect();
+    const damageEl = document.createElement('div');
+    damageEl.className = 'damage-number';
+    damageEl.textContent = `-${damage}`;
+    damageEl.style.left = `${rect.left + rect.width / 2}px`;
+    damageEl.style.top = `${rect.top + rect.height / 3}px`;
+
+    document.body.appendChild(damageEl);
+    setTimeout(() => damageEl.remove(), 1000);
 }
 
-.particle {
-    position: absolute;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    pointer-events: none;
+function checkAndRemoveDeadCards() {
+    // Check player field
+    gameState.playerField = gameState.playerField.filter(card => {
+        if (card.currentHealth <= 0) {
+            addBattleLog(`💀 ${card.name} was destroyed!`);
+            animateCardDestruction(card.id);
+            return false;
+        }
+        return true;
+    });
+
+    // Check opponent field
+    gameState.opponentField = gameState.opponentField.filter(card => {
+        if (card.currentHealth <= 0) {
+            addBattleLog(`💀 ${card.name} was destroyed!`);
+            animateCardDestruction(card.id);
+            return false;
+        }
+        return true;
+    });
 }
 
-/* Pack Wrapper */
-.pack-wrapper {
-    position: relative;
-    perspective: 1500px;
-    cursor: pointer;
+function animateCardDestruction(cardId) {
+    const cardEl = document.querySelector(`[data-card-id="${cardId}"]`);
+    if (cardEl) {
+        cardEl.classList.add('card-destroying');
+    }
 }
 
-.pack-3d-premium {
-    width: 220px;
-    height: 320px;
-    position: relative;
-    transform-style: preserve-3d;
-    transition: transform 0.3s ease;
+function drawCard(player) {
+    if (player === 'player') {
+        if (gameState.playerDeck.length > 0 && gameState.playerHand.length < 8) {
+            const newCard = gameState.playerDeck.shift();
+            gameState.playerHand.push(newCard);
+            return newCard;
+        }
+    }
+    return null;
 }
 
-.pack-3d-premium:hover {
-    transform: scale(1.05);
+// Turn Management
+function endTurn() {
+    if (gameState.currentBattle.turn !== 'player' || battleState.isAnimating) return;
+
+    battleState.selectedAttacker = null;
+    gameState.currentBattle.turn = 'opponent';
+
+    addBattleLog("⏰ Ending your turn...");
+
+    renderBattle();
+    showTurnIndicator('opponent');
+
+    setTimeout(() => {
+        executeOpponentTurn();
+    }, 1500);
 }
 
-/* Pack Face Styling */
-.pack-face-premium {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    border-radius: 15px;
-    backface-visibility: hidden;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
+function executeOpponentTurn() {
+    gameState.currentBattle.turnNumber++;
+    gameState.opponentEnergy = Math.min(gameState.currentBattle.maxEnergy, Math.floor(gameState.currentBattle.turnNumber / 2) + 1);
+
+    addBattleLog(`🤖 Opponent's turn! Energy: ${gameState.opponentEnergy}`);
+
+    // Draw a card
+    if (gameState.opponentHand.length < 6) {
+        gameState.opponentHand.push(...generateOpponentHand(1));
+    }
+
+    renderBattle();
+
+    // AI plays cards
+    setTimeout(() => aiPlayCards(), 800);
 }
 
-.pack-front-premium {
-    background: linear-gradient(145deg, #3a7bd5 0%, #1a4a8a 50%, #0d2f5e 100%);
-    border: 4px solid #5a9bff;
-    box-shadow:
-        0 0 30px rgba(90, 155, 255, 0.4),
-        inset 0 0 60px rgba(255, 255, 255, 0.1);
+function aiPlayCards() {
+    // Sort by cost (play cheaper cards first to maximize plays)
+    const playableCards = gameState.opponentHand
+        .filter(c => c.cost <= gameState.opponentEnergy)
+        .sort((a, b) => a.cost - b.cost);
+
+    let cardsPlayed = 0;
+
+    const playNext = () => {
+        if (cardsPlayed >= playableCards.length || gameState.opponentField.length >= 4) {
+            setTimeout(() => aiAttackPhase(), 600);
+            return;
+        }
+
+        const card = playableCards[cardsPlayed];
+
+        if (gameState.opponentEnergy >= card.cost) {
+            gameState.opponentEnergy -= card.cost;
+            gameState.opponentHand = gameState.opponentHand.filter(c => c.id !== card.id);
+
+            const fieldCard = {
+                ...card,
+                canAttack: true,
+                hasAttacked: false,
+                currentHealth: card.defense
+            };
+            gameState.opponentField.push(fieldCard);
+
+            addBattleLog(`🤖 Opponent played ${card.name}!`);
+            renderBattle();
+
+            cardsPlayed++;
+            setTimeout(playNext, 500);
+        } else {
+            cardsPlayed++;
+            playNext();
+        }
+    };
+
+    playNext();
 }
 
-.pack-front-premium.premium {
-    background: linear-gradient(145deg, #9b59b6 0%, #6c3483 50%, #4a235a 100%);
-    border-color: #bb8fce;
-    box-shadow:
-        0 0 40px rgba(155, 89, 182, 0.5),
-        inset 0 0 60px rgba(255, 255, 255, 0.1);
+function aiAttackPhase() {
+    const attackers = gameState.opponentField.filter(c => c.canAttack && !c.hasAttacked);
+
+    if (attackers.length === 0) {
+        setTimeout(() => endOpponentTurn(), 500);
+        return;
+    }
+
+    let attackIndex = 0;
+
+    const executeNextAttack = () => {
+        if (attackIndex >= attackers.length) {
+            setTimeout(() => endOpponentTurn(), 500);
+            return;
+        }
+
+        const attacker = attackers[attackIndex];
+
+        if (gameState.playerField.length > 0) {
+            // Target weakest player card
+            const target = [...gameState.playerField].sort((a, b) => a.currentHealth - b.currentHealth)[0];
+
+            // Visual feedback
+            const attackerEl = document.querySelector(`[data-card-id="${attacker.id}"]`);
+            const defenderEl = document.querySelector(`[data-card-id="${target.id}"]`);
+
+            if (attackerEl) attackerEl.classList.add('card-attacking');
+
+            setTimeout(() => {
+                if (defenderEl) defenderEl.classList.add('card-attacked');
+
+                const damage = attacker.attack;
+                dealDamage(target, damage, 'player');
+                showDamageNumber(defenderEl, damage);
+
+                const counterDamage = Math.floor(target.attack / 2);
+                dealDamage(attacker, counterDamage, 'opponent');
+
+                addBattleLog(`🤖 ${attacker.name} attacks ${target.name} for ${damage}!`);
+
+                attacker.hasAttacked = true;
+                attacker.canAttack = false;
+
+                setTimeout(() => {
+                    attackerEl?.classList.remove('card-attacking');
+                    defenderEl?.classList.remove('card-attacked');
+                    checkAndRemoveDeadCards();
+                    renderBattle();
+
+                    attackIndex++;
+                    setTimeout(executeNextAttack, 400);
+                }, 400);
+            }, 300);
+        } else {
+            // Direct attack
+            const damage = attacker.attack;
+            gameState.playerHealth -= damage;
+            addBattleLog(`🤖 ${attacker.name} attacks you directly for ${damage}!`);
+
+            attacker.hasAttacked = true;
+            attacker.canAttack = false;
+
+            if (gameState.playerHealth <= 0) {
+                setTimeout(() => endBattle(false), 500);
+                return;
+            }
+
+            renderBattle();
+            attackIndex++;
+            setTimeout(executeNextAttack, 500);
+        }
+    };
+
+    executeNextAttack();
 }
 
-.pack-front-premium.trending {
-    background: linear-gradient(145deg, #e74c3c 0%, #c0392b 50%, #922b21 100%);
-    border-color: #f1948a;
-    box-shadow:
-        0 0 40px rgba(231, 76, 60, 0.5),
-        inset 0 0 60px rgba(255, 255, 255, 0.1);
+function endOpponentTurn() {
+    // Reset opponent cards for next turn
+    gameState.opponentField.forEach(c => {
+        c.canAttack = true;
+        c.hasAttacked = false;
+    });
+
+    startPlayerTurn();
 }
 
-.pack-logo {
-    font-size: 4rem;
-    margin-bottom: 15px;
-    filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.5));
+function startPlayerTurn() {
+    gameState.currentBattle.turn = 'player';
+    gameState.currentBattle.turnNumber++;
+    gameState.playerEnergy = Math.min(gameState.currentBattle.maxEnergy, Math.floor(gameState.currentBattle.turnNumber / 2) + 1);
+
+    // Enable attacks for player cards
+    gameState.playerField.forEach(c => {
+        c.canAttack = true;
+        c.hasAttacked = false;
+    });
+
+    // Draw a card
+    const drawnCard = drawCard('player');
+    if (drawnCard) {
+        addBattleLog(`📥 You drew ${drawnCard.name}!`);
+    }
+
+    addBattleLog(`✨ Your turn! Energy: ${gameState.playerEnergy}`);
+
+    showTurnIndicator('player');
+    renderBattle();
 }
 
-.pack-title {
-    font-size: 1.4rem;
-    font-weight: bold;
-    text-transform: uppercase;
-    letter-spacing: 3px;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+function endBattle(victory) {
+    gameState.currentBattle = null;
+
+    const modal = document.getElementById('result-modal');
+    const title = document.getElementById('result-title');
+    const message = document.getElementById('result-message');
+    const rewards = document.getElementById('result-rewards');
+
+    if (victory) {
+        gameState.battlesWon++; // Track victories
+        title.textContent = '🎉 Victory!';
+        title.style.color = '#4caf50';
+        message.textContent = 'You defeated your opponent!';
+
+        const ticketReward = 1 + Math.floor(Math.random() * 2); // 1-2 tickets
+        gameState.tickets += ticketReward;
+        rewards.innerHTML = `<p>🎟️ +${ticketReward} Pack Ticket${ticketReward > 1 ? 's' : ''}!</p><p class="reward-hint">Use tickets to skip video ads</p>`;
+    } else {
+        title.textContent = '💀 Defeat';
+        title.style.color = '#e74c3c';
+        message.textContent = 'You were defeated...';
+        rewards.innerHTML = '<p>Better luck next time!</p>';
+    }
+
+    saveGameState();
+    checkAchievements(); // Check for new achievements
+    modal.classList.remove('hidden');
 }
 
-.pack-shine {
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: linear-gradient(
-        45deg,
-        transparent 30%,
-        rgba(255, 255, 255, 0.1) 50%,
-        transparent 70%
+function forfeitBattle() {
+    if (confirm('Are you sure you want to forfeit?')) {
+        endBattle(false);
+    }
+}
+
+function closeResultModal() {
+    document.getElementById('result-modal').classList.add('hidden');
+    showScreen('main-menu');
+}
+
+function addBattleLog(message) {
+    const log = document.getElementById('battle-log');
+    if (log) {
+        log.innerHTML = `<p>${message}</p>` + log.innerHTML;
+        log.scrollTop = 0;
+    }
+}
+
+// ==========================================
+// Boss Battles
+// ==========================================
+
+function initializeBosses() {
+    const bossGrid = document.getElementById('boss-list');
+    if (!bossGrid) return;
+
+    bossGrid.innerHTML = '';
+
+    BOSS_ARTICLES.forEach((boss, index) => {
+        const bossCard = document.createElement('div');
+        bossCard.className = 'boss-card';
+        bossCard.innerHTML = `
+            <h3>👹 ${boss.name}</h3>
+            <p>${boss.description}</p>
+            <div class="boss-stats">
+                <span>❤️ ???</span>
+                <span>⚔️ ???</span>
+            </div>
+            <p style="margin-top: 10px; color: var(--legendary);">Click to challenge!</p>
+        `;
+        bossCard.onclick = () => startBossBattle(boss);
+        bossGrid.appendChild(bossCard);
+    });
+}
+
+async function startBossBattle(boss) {
+    if (gameState.deck.length < 5) {
+        alert('You need at least 5 cards in your deck!');
+        return;
+    }
+
+    showLoading('Loading boss data...');
+
+    try {
+        const details = await fetchArticleDetails(boss.title);
+
+        if (!details) {
+            hideLoading();
+            alert('Failed to load boss data. Try again!');
+            return;
+        }
+
+        const bossCard = {
+            name: boss.name,
+            description: details.extract?.substring(0, 200) || boss.description,
+            image: details.image,
+            articleLength: details.length,
+            health: Math.floor(details.length / 500) + 50, // Boss HP scales with article length
+            attack: Math.floor(Math.log10(details.length) * 5),
+            defense: Math.floor((details.categories || 5) * 2),
+            currentHealth: 0
+        };
+
+        bossCard.currentHealth = bossCard.health;
+
+        gameState.bossBattle = {
+            boss: bossCard,
+            playerHealth: 30,
+            playerEnergy: 1,
+            turn: 1,
+            playerHand: shuffleArray([...gameState.deck]).slice(0, 5),
+            playerField: []
+        };
+
+        hideLoading();
+        showScreen('boss-battle');
+        renderBossBattle();
+
+    } catch (error) {
+        hideLoading();
+        alert('Error loading boss. Please try again.');
+        console.error(error);
+    }
+}
+
+function renderBossBattle() {
+    const boss = gameState.bossBattle.boss;
+
+    // Render boss card
+    const bossDisplay = document.getElementById('boss-card-display');
+    const imageStyle = boss.image
+        ? `background-image: url('${boss.image}'); background-size: cover;`
+        : '';
+
+    bossDisplay.innerHTML = `
+        <div class="boss-image" style="height: 200px; ${imageStyle}"></div>
+        <div class="boss-info" style="padding: 20px;">
+            <h2>${boss.name}</h2>
+            <p style="font-size: 0.9rem; color: var(--text-secondary);">${boss.description}</p>
+            <div class="boss-card-stats" style="display: flex; gap: 15px; margin-top: 10px;">
+                <span>⚔️ ${boss.attack}</span>
+                <span>🛡️ ${boss.defense}</span>
+            </div>
+        </div>
+    `;
+
+    // Update boss health
+    const healthPercent = (boss.currentHealth / boss.health) * 100;
+    document.getElementById('boss-health-fill').style.width = `${healthPercent}%`;
+    document.getElementById('boss-health-text').textContent = `${boss.currentHealth}/${boss.health}`;
+
+    // Boss ability text
+    document.getElementById('boss-ability-text').textContent =
+        `"The weight of ${boss.articleLength.toLocaleString()} characters of knowledge crushes all who oppose!"`;
+
+    // Player stats
+    document.getElementById('boss-player-health').textContent = gameState.bossBattle.playerHealth;
+    document.getElementById('boss-player-energy').textContent = gameState.bossBattle.playerEnergy;
+
+    const playerHealthPercent = (gameState.bossBattle.playerHealth / 30) * 100;
+    document.getElementById('boss-player-health-bar').style.width = `${playerHealthPercent}%`;
+
+    // Player hand
+    const handEl = document.getElementById('boss-player-hand');
+    handEl.innerHTML = '';
+
+    gameState.bossBattle.playerHand.forEach(card => {
+        const cardEl = createCardElement(card, { small: true });
+        cardEl.onclick = () => playBossCard(card);
+        handEl.appendChild(cardEl);
+    });
+}
+
+function playBossCard(card) {
+    if (gameState.bossBattle.playerEnergy < card.cost) {
+        alert('Not enough energy!');
+        return;
+    }
+
+    gameState.bossBattle.playerEnergy -= card.cost;
+    gameState.bossBattle.playerHand = gameState.bossBattle.playerHand.filter(c => c.id !== card.id);
+
+    // Deal damage to boss
+    let damage = card.attack + card.knowledge;
+
+    // Apply ability bonuses
+    if (card.ability?.type === 'science') {
+        damage += 3;
+    }
+
+    gameState.bossBattle.boss.currentHealth -= damage;
+
+    // Check if boss defeated
+    if (gameState.bossBattle.boss.currentHealth <= 0) {
+        endBossBattle(true);
+        return;
+    }
+
+    renderBossBattle();
+}
+
+function bossTurn() {
+    const boss = gameState.bossBattle.boss;
+
+    // Boss attacks
+    const damage = boss.attack;
+    gameState.bossBattle.playerHealth -= damage;
+
+    if (gameState.bossBattle.playerHealth <= 0) {
+        endBossBattle(false);
+        return;
+    }
+
+    // Next turn
+    gameState.bossBattle.turn++;
+    gameState.bossBattle.playerEnergy = Math.min(10, gameState.bossBattle.turn);
+
+    // Draw cards
+    const remainingDeck = gameState.deck.filter(c =>
+        !gameState.bossBattle.playerHand.find(h => h.id === c.id)
     );
-    animation: packShine 3s ease-in-out infinite;
-}
 
-@keyframes packShine {
-    0%, 100% { transform: translateX(-100%) rotate(45deg); }
-    50% { transform: translateX(100%) rotate(45deg); }
-}
-
-/* Pack Animations */
-.pack-idle {
-    animation: packFloat 3s ease-in-out infinite;
-}
-
-@keyframes packFloat {
-    0%, 100% { transform: translateY(0) rotateY(0deg); }
-    25% { transform: translateY(-10px) rotateY(3deg); }
-    75% { transform: translateY(-10px) rotateY(-3deg); }
-}
-
-.pack-shake {
-    animation: packShake 0.3s ease-in-out; /* Faster shake */
-}
-
-@keyframes packShake {
-    0%, 100% { transform: translateX(0) rotate(0deg); }
-    20% { transform: translateX(-15px) rotate(-5deg); }
-    40% { transform: translateX(15px) rotate(5deg); }
-    60% { transform: translateX(-10px) rotate(-3deg); }
-    80% { transform: translateX(10px) rotate(3deg); }
-}
-
-.pack-glow-pulse {
-    animation: glowPulse 1s ease-in-out infinite;
-}
-
-@keyframes glowPulse {
-    0%, 100% {
-        filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.5));
+    if (remainingDeck.length > 0 && gameState.bossBattle.playerHand.length < 6) {
+        const newCard = remainingDeck[Math.floor(Math.random() * remainingDeck.length)];
+        gameState.bossBattle.playerHand.push(newCard);
     }
-    50% {
-        filter: drop-shadow(0 0 50px rgba(255, 215, 0, 0.9));
+
+    renderBossBattle();
+}
+
+function endBossBattle(victory) {
+    const modal = document.getElementById('result-modal');
+    const title = document.getElementById('result-title');
+    const message = document.getElementById('result-message');
+    const rewards = document.getElementById('result-rewards');
+
+    if (victory) {
+        gameState.battlesWon++; // Track victories
+        title.textContent = '👑 Boss Defeated!';
+        title.style.color = '#ff9800';
+        message.textContent = `You conquered ${gameState.bossBattle.boss.name}!`;
+
+        const ticketReward = 3 + Math.floor(Math.random() * 3); // 3-5 tickets
+        gameState.tickets += ticketReward;
+        rewards.innerHTML = `<p>🎟️ +${ticketReward} Pack Tickets!</p><p>🏆 Boss Trophy Unlocked!</p>`;
+    } else {
+        title.textContent = '💀 Defeated by the Boss';
+        title.style.color = '#e74c3c';
+        message.textContent = 'The knowledge was too overwhelming...';
+        rewards.innerHTML = '<p>Train harder and try again!</p>';
     }
+
+    gameState.bossBattle = null;
+    saveGameState();
+    checkAchievements(); // Check for new achievements
+    modal.classList.remove('hidden');
 }
 
-.pack-burst {
-    animation: packBurst 0.6s ease-out forwards;
-}
-
-@keyframes packBurst {
-    0% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.3); opacity: 0.8; }
-    100% { transform: scale(2); opacity: 0; }
-}
-
-/* Card Reveal Container */
-.cards-reveal-container {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-}
-
-.cards-stack {
-    position: relative;
-    width: 200px;
-    height: 280px;
-    perspective: 1000px;
-}
-
-.card-reveal-wrapper {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    transform-style: preserve-3d;
-    cursor: pointer;
-}
-
-/* 3D Card Flip */
-.card-3d {
-    width: 180px;
-    height: 260px;
-    position: relative;
-    transform-style: preserve-3d;
-    transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Faster flip */
-}
-
-.card-3d.flipped {
-    transform: rotateY(180deg);
-}
-
-.card-face {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    backface-visibility: hidden;
-    border-radius: 12px;
-    overflow: hidden;
-}
-
-.card-back-face {
-    background: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
-    border: 3px solid #4a5568;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.card-back-pattern {
-    width: 80%;
-    height: 80%;
-    border: 2px solid #4a5568;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: repeating-linear-gradient(
-        45deg,
-        transparent,
-        transparent 10px,
-        rgba(74, 85, 104, 0.3) 10px,
-        rgba(74, 85, 104, 0.3) 20px
-    );
-}
-
-.card-back-pattern span {
-    font-size: 4rem;
-    opacity: 0.5;
-}
-
-.card-front-face {
-    transform: rotateY(180deg);
-}
-
-/* Card Slide In Animation */
-.card-slide-in {
-    animation: cardSlideIn 0.3s ease-out forwards; /* Faster slide */
-}
-
-@keyframes cardSlideIn {
-    0% {
-        transform: translateY(100px) scale(0.8);
-        opacity: 0;
-    }
-    100% {
-        transform: translateY(0) scale(1);
-        opacity: 1;
+function forfeitBoss() {
+    if (confirm('Retreat from the boss battle?')) {
+        gameState.bossBattle = null;
+        showScreen('boss-select');
     }
 }
 
-/* Rarity Reveal Effects */
-.reveal-common {
-    animation: commonReveal 0.3s ease-out;
-}
+// ==========================================
+// UI & Navigation
+// ==========================================
 
-@keyframes commonReveal {
-    0% { opacity: 0.8; }
-    100% { opacity: 1; }
-}
+function showScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(screen => {
+        screen.classList.remove('active');
+    });
 
-.reveal-uncommon {
-    animation: uncommonReveal 0.5s ease-out;
-}
-
-@keyframes uncommonReveal {
-    0%, 100% { filter: brightness(1); }
-    50% { filter: brightness(1.3); }
-}
-
-.reveal-rare {
-    animation: rareReveal 0.6s ease-out;
-}
-
-@keyframes rareReveal {
-    0% { filter: brightness(1) drop-shadow(0 0 0 transparent); }
-    50% { filter: brightness(1.5) drop-shadow(0 0 30px rgba(33, 150, 243, 0.8)); }
-    100% { filter: brightness(1) drop-shadow(0 0 15px rgba(33, 150, 243, 0.5)); }
-}
-
-.reveal-epic {
-    animation: epicReveal 0.8s ease-out;
-}
-
-@keyframes epicReveal {
-    0% { transform: scale(1); filter: brightness(1); }
-    25% { transform: scale(1.1); filter: brightness(1.5) drop-shadow(0 0 40px rgba(156, 39, 176, 0.9)); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 20px rgba(156, 39, 176, 0.6)); }
-}
-
-.reveal-legendary {
-    animation: legendaryReveal 1s ease-out;
-}
-
-@keyframes legendaryReveal {
-    0% { transform: scale(1) rotate(0deg); filter: brightness(1); }
-    20% { transform: scale(1.15) rotate(-2deg); filter: brightness(2) drop-shadow(0 0 50px rgba(255, 152, 0, 1)); }
-    40% { transform: scale(1.1) rotate(2deg); }
-    60% { transform: scale(1.12) rotate(-1deg); filter: brightness(1.5); }
-    100% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 25px rgba(255, 152, 0, 0.7)); }
-}
-
-/* Screen Flash for Legendary */
-.screen-flash {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: white;
-    pointer-events: none;
-    z-index: 9999;
-    animation: screenFlash 0.3s ease-out forwards;
-}
-
-@keyframes screenFlash {
-    0% { opacity: 0.8; }
-    100% { opacity: 0; }
-}
-
-/* Final Cards Display */
-.final-cards-display {
-    display: flex;
-    justify-content: center;
-    gap: 15px;
-    flex-wrap: wrap;
-    padding: 20px;
-    max-width: 1000px;
-}
-
-.final-card-wrapper {
-    animation: finalCardAppear 0.4s ease-out forwards;
-    animation-delay: var(--delay, 0s);
-    opacity: 0;
-    transform: scale(0.8);
-}
-
-@keyframes finalCardAppear {
-    0% { opacity: 0; transform: scale(0.8) translateY(30px); }
-    100% { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.final-card-wrapper:hover {
-    transform: translateY(-15px) scale(1.1);
-    z-index: 10;
-}
-
-/* Pack Opening Text */
-.pack-instruction {
-    position: absolute;
-    bottom: 80px;
-    font-size: 1.2rem;
-    color: rgba(255, 255, 255, 0.7);
-    animation: instructionPulse 2s ease-in-out infinite;
-}
-
-@keyframes instructionPulse {
-    0%, 100% { opacity: 0.5; }
-    50% { opacity: 1; }
-}
-
-.reveal-counter {
-    position: absolute;
-    top: 30px;
-    font-size: 1.5rem;
-    color: var(--gold);
-}
-
-/* ==========================================
-   BATTLE SYSTEM ENHANCEMENTS
-   ========================================== */
-
-/* Turn Indicator */
-.turn-indicator {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 2.5rem;
-    font-weight: bold;
-    text-transform: uppercase;
-    letter-spacing: 5px;
-    z-index: 100;
-    pointer-events: none;
-    animation: turnIndicatorShow 1.5s ease-out forwards;
-}
-
-.turn-indicator.player-turn {
-    color: #4caf50;
-    text-shadow: 0 0 30px rgba(76, 175, 80, 0.8);
-}
-
-.turn-indicator.opponent-turn {
-    color: #e74c3c;
-    text-shadow: 0 0 30px rgba(231, 76, 60, 0.8);
-}
-
-@keyframes turnIndicatorShow {
-    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
-    20% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
-    80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-    100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
-}
-
-/* Card Attack Animation */
-.card-attacking {
-    animation: cardAttack 0.5s ease-out;
-    z-index: 50;
-}
-
-@keyframes cardAttack {
-    0% { transform: translateY(0); }
-    30% { transform: translateY(-30px) scale(1.1); }
-    60% { transform: translateY(20px) scale(1.05); }
-    100% { transform: translateY(0) scale(1); }
-}
-
-.card-attacked {
-    animation: cardHit 0.4s ease-out;
-}
-
-@keyframes cardHit {
-    0%, 100% { transform: translateX(0); filter: brightness(1); }
-    25% { transform: translateX(-10px); filter: brightness(1.5); }
-    50% { transform: translateX(10px); filter: brightness(0.7); }
-    75% { transform: translateX(-5px); }
-}
-
-/* Damage Number Popup */
-.damage-number {
-    position: absolute;
-    font-size: 2rem;
-    font-weight: bold;
-    color: #e74c3c;
-    text-shadow:
-        2px 2px 0 #000,
-        -2px -2px 0 #000,
-        2px -2px 0 #000,
-        -2px 2px 0 #000;
-    pointer-events: none;
-    z-index: 200;
-    animation: damageFloat 1s ease-out forwards;
-}
-
-.damage-number.heal {
-    color: #4caf50;
-}
-
-@keyframes damageFloat {
-    0% {
-        opacity: 1;
-        transform: translateY(0) scale(0.5);
+    const targetScreen = document.getElementById(screenId);
+    if (targetScreen) {
+        targetScreen.classList.add('active');
     }
-    20% {
-        transform: translateY(-20px) scale(1.3);
+
+    // Screen-specific initialization
+    switch (screenId) {
+        case 'collection':
+            renderCollection();
+            break;
+        case 'deck-builder':
+            renderDeckBuilder();
+            break;
+        case 'boss-select':
+            initializeBosses();
+            break;
     }
-    100% {
-        opacity: 0;
-        transform: translateY(-60px) scale(1);
+
+    updateUI();
+}
+
+function updateUI() {
+    // Update tickets displays
+    const ticketsDisplay = document.getElementById('tickets-display');
+    const packTickets = document.getElementById('pack-tickets');
+
+    if (ticketsDisplay) ticketsDisplay.textContent = gameState.tickets;
+    if (packTickets) packTickets.textContent = gameState.tickets;
+
+    // Update cards count
+    document.getElementById('cards-count').textContent = gameState.cards.length;
+
+    // Update golden pack progress
+    updateGoldenPackProgress();
+}
+
+function showLoading(text = 'Loading...') {
+    document.getElementById('loading-text').textContent = text;
+    document.getElementById('loading-overlay').classList.remove('hidden');
+}
+
+function hideLoading() {
+    document.getElementById('loading-overlay').classList.add('hidden');
+}
+
+// ==========================================
+// Data Persistence
+// ==========================================
+
+function saveGameState() {
+    const saveData = {
+        tickets: gameState.tickets,
+        packsOpened: gameState.packsOpened,
+        totalPacksOpened: gameState.totalPacksOpened,
+        battlesWon: gameState.battlesWon,
+        cards: gameState.cards,
+        deck: gameState.deck,
+        achievements: gameState.achievements
+    };
+
+    localStorage.setItem('wikicards_save', JSON.stringify(saveData));
+}
+
+function loadGameState() {
+    const saved = localStorage.getItem('wikicards_save');
+
+    if (saved) {
+        try {
+            const data = JSON.parse(saved);
+            // If old save with 0 tickets and no packsOpened, give them 10 tickets
+            if (data.packsOpened === undefined && (data.tickets === 0 || data.tickets === undefined)) {
+                gameState.tickets = 10;
+            } else {
+                gameState.tickets = data.tickets !== undefined ? data.tickets : 10;
+            }
+            gameState.packsOpened = data.packsOpened || 0;
+            gameState.totalPacksOpened = data.totalPacksOpened || data.packsOpened || 0;
+            gameState.battlesWon = data.battlesWon || 0;
+            gameState.cards = data.cards || [];
+            gameState.deck = data.deck || [];
+            gameState.achievements = data.achievements || {
+                firstWin: false,
+                collector: false,
+                goldenTouch: false,
+                wikiScholar: false
+            };
+        } catch (e) {
+            console.error('Failed to load save data:', e);
+            // On error, use defaults with 10 tickets
+            gameState.tickets = 10;
+        }
+    }
+    // If no saved data, keep the default 10 tickets
+
+    // Update golden pack progress on load
+    updateGoldenPackProgress();
+
+    // Update achievements display
+    updateAchievementsDisplay();
+}
+
+// ==========================================
+// Utility Functions
+// ==========================================
+
+function shuffleArray(array) {
+    const newArray = [...array];
+    for (let i = newArray.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    }
+    return newArray;
+}
+
+// ==========================================
+// Event Listeners for Attack
+// ==========================================
+
+document.addEventListener('click', (e) => {
+    // Check if clicking on opponent area to attack directly
+    if (battleState.selectedAttacker && e.target.closest('#opponent-field') && gameState.opponentField.length === 0) {
+        executeDirectAttack(battleState.selectedAttacker);
+    }
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeModal();
+        document.getElementById('result-modal').classList.add('hidden');
+        closeCheatMenu();
+    }
+});
+
+// ==========================================
+// CHEAT MENU SYSTEM (type "1234" to open)
+// ==========================================
+
+let cheatSequence = '';
+const CHEAT_CODE = '1234';
+
+document.addEventListener('keydown', (e) => {
+    // Only track number keys
+    if (e.key >= '0' && e.key <= '9') {
+        cheatSequence += e.key;
+
+        // Keep only last 4 characters
+        if (cheatSequence.length > 4) {
+            cheatSequence = cheatSequence.slice(-4);
+        }
+
+        // Check if cheat code entered
+        if (cheatSequence === CHEAT_CODE) {
+            cheatSequence = '';
+            toggleCheatMenu();
+        }
+    }
+});
+
+function toggleCheatMenu() {
+    let menu = document.getElementById('cheat-menu');
+    if (menu) {
+        menu.classList.toggle('hidden');
+    } else {
+        createCheatMenu();
     }
 }
 
-/* Card Destruction Effect */
-.card-destroying {
-    animation: cardDestroy 0.6s ease-out forwards;
-}
-
-@keyframes cardDestroy {
-    0% {
-        transform: scale(1) rotate(0deg);
-        opacity: 1;
-        filter: brightness(1);
-    }
-    30% {
-        transform: scale(1.1) rotate(-5deg);
-        filter: brightness(2);
-    }
-    100% {
-        transform: scale(0) rotate(45deg);
-        opacity: 0;
-        filter: brightness(0);
-    }
-}
-
-/* Can Attack Glow */
-.card.can-attack {
-    cursor: pointer;
-    animation: canAttackPulse 1s ease-in-out infinite;
-}
-
-@keyframes canAttackPulse {
-    0%, 100% {
-        box-shadow: 0 0 10px rgba(46, 204, 113, 0.5),
-                    inset 0 0 10px rgba(46, 204, 113, 0.1);
-    }
-    50% {
-        box-shadow: 0 0 25px rgba(46, 204, 113, 0.8),
-                    inset 0 0 20px rgba(46, 204, 113, 0.2);
-    }
-}
-
-/* Selected Attacker */
-.card.selected-attacker {
-    animation: selectedPulse 0.5s ease-in-out infinite alternate;
-    box-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
-    border-color: var(--gold) !important;
-}
-
-@keyframes selectedPulse {
-    from { transform: scale(1.02); }
-    to { transform: scale(1.08); }
-}
-
-/* Valid Target */
-.card.valid-target {
-    cursor: crosshair;
-    animation: targetPulse 0.6s ease-in-out infinite alternate;
-}
-
-@keyframes targetPulse {
-    from {
-        box-shadow: 0 0 15px rgba(231, 76, 60, 0.5);
-        border-color: rgba(231, 76, 60, 0.7);
-    }
-    to {
-        box-shadow: 0 0 30px rgba(231, 76, 60, 0.9);
-        border-color: #e74c3c;
-    }
-}
-
-/* Player Area Target (for direct attacks) */
-.opponent-area.targetable {
-    position: relative;
-}
-
-.opponent-area.targetable::after {
-    content: "⚔️ Click to Attack!";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(231, 76, 60, 0.9);
-    padding: 15px 30px;
-    border-radius: 10px;
-    font-size: 1.2rem;
-    animation: directAttackPulse 1s ease-in-out infinite;
-    cursor: pointer;
-}
-
-@keyframes directAttackPulse {
-    0%, 100% { opacity: 0.8; transform: translate(-50%, -50%) scale(1); }
-    50% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
-}
-
-/* Battle Log Enhanced */
-.battle-log {
-    background: linear-gradient(180deg, rgba(26, 26, 46, 0.95), rgba(10, 10, 26, 0.95));
-    border: 1px solid var(--accent-primary);
-    max-height: 120px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--accent-primary) transparent;
-}
-
-.battle-log::-webkit-scrollbar {
-    width: 6px;
-}
-
-.battle-log::-webkit-scrollbar-thumb {
-    background: var(--accent-primary);
-    border-radius: 3px;
-}
-
-.battle-log p {
-    padding: 5px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    animation: logSlideIn 0.3s ease-out;
-}
-
-@keyframes logSlideIn {
-    from { opacity: 0; transform: translateX(-20px); }
-    to { opacity: 1; transform: translateX(0); }
-}
-
-/* Energy Display Enhanced */
-.energy-display {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.energy-orb {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #f39c12, #e67e22);
-    box-shadow: 0 0 10px rgba(243, 156, 18, 0.5);
-    transition: all 0.3s ease;
-}
-
-.energy-orb.empty {
-    background: #333;
-    box-shadow: none;
-}
-
-/* Card Health Display */
-.card-health {
-    position: absolute;
-    bottom: 5px;
-    right: 5px;
-    background: var(--health);
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 0.75rem;
-    font-weight: bold;
-}
-
-.card-health.damaged {
-    animation: healthPulse 0.3s ease-out;
-}
-
-@keyframes healthPulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.3); background: #ff0000; }
-}
-
-/* End Turn Button States */
-#end-turn-btn {
-    transition: all 0.3s ease;
-}
-
-#end-turn-btn.active {
-    background: linear-gradient(135deg, var(--accent-primary), var(--uncommon));
-    animation: endTurnReady 1s ease-in-out infinite;
-}
-
-@keyframes endTurnReady {
-    0%, 100% { box-shadow: 0 0 10px rgba(74, 144, 217, 0.5); }
-    50% { box-shadow: 0 0 25px rgba(74, 144, 217, 0.8); }
-}
-
-#end-turn-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-/* Opponent Card Back Enhanced */
-.opponent-card-back {
-    background: linear-gradient(135deg, #2c3e50, #1a252f) !important;
-    border: 3px solid #4a5568 !important;
-}
-
-.card-back-design {
-    font-size: 2.5rem;
-    color: #4a5568;
-}
-
-/* Battle Field Enhancement */
-.card-field {
-    background: linear-gradient(180deg, rgba(0,0,0,0.3), rgba(0,0,0,0.1));
-    border: 2px dashed rgba(255,255,255,0.2);
-    min-height: 180px;
-}
-
-.card-field.player-field {
-    border-color: rgba(76, 175, 80, 0.3);
-}
-
-.card-field.opponent-field {
-    border-color: rgba(231, 76, 60, 0.3);
-}
-
-/* Responsive Adjustments */
-@media (max-width: 768px) {
-    .turn-indicator { font-size: 1.5rem; }
-    .damage-number { font-size: 1.5rem; }
-    .pack-3d-premium { width: 180px; height: 260px; }
-    .final-cards-display { gap: 10px; }
-}
-
-@media (max-width: 480px) {
-    .turn-indicator { font-size: 1.2rem; letter-spacing: 2px; }
-    .pack-3d-premium { width: 150px; height: 220px; }
-}
-
-/* ==========================================
-   VIDEO AD SYSTEM
-   ========================================== */
-
-.video-ad-content {
-    max-width: 500px;
-    text-align: center;
-}
-
-.video-ad-content h2 {
-    color: var(--gold);
-    margin-bottom: 10px;
-}
-
-.video-instruction {
-    color: var(--text-secondary);
-    margin-bottom: 20px;
-}
-
-.video-container {
-    position: relative;
-    width: 100%;
-    max-width: 450px;
-    aspect-ratio: 16/9;
-    background: #000;
-    border-radius: 10px;
-    overflow: hidden;
-    margin: 0 auto 20px auto;
-}
-
-.video-container video {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    background: #000;
-}
-
-.video-placeholder {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, #1a1a2e, #2d2d44);
-    color: var(--text-secondary);
-}
-
-.video-placeholder span {
-    font-size: 4rem;
-    margin-bottom: 10px;
-    animation: pulse 2s ease-in-out infinite;
-}
-
-.video-timer {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 20px;
-    justify-content: center;
-}
-
-.video-progress-bar {
-    flex: 1;
-    max-width: 200px;
-    height: 8px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.video-progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--accent-primary), var(--gold));
-    width: 0%;
-    transition: width 1s linear;
-}
-
-#video-countdown {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: var(--gold);
-}
-
-#skip-video-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-#skip-video-btn:not(:disabled) {
-    animation: btnReady 0.5s ease-out;
-    background: linear-gradient(135deg, var(--uncommon), #27ae60) !important;
-}
-
-@keyframes btnReady {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.1); }
-    100% { transform: scale(1); }
-}
-
-/* Tickets Display */
-.tickets-display {
-    background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 215, 0, 0.1));
-    padding: 5px 15px;
-    border-radius: 20px;
-    border: 1px solid var(--gold);
-    color: var(--gold);
-    font-weight: bold;
-}
-
-.pack-price {
-    display: block;
-    margin-top: 10px;
-    padding: 8px 15px;
-    background: linear-gradient(135deg, var(--accent-primary), #5a78a0);
-    border-radius: 20px;
-    font-size: 0.85rem;
-    font-weight: bold;
-}
-
-.reward-hint {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    margin-top: 5px;
-}
-
-/* Golden Pack Progress */
-.golden-progress {
-    margin-top: 15px;
-    padding-top: 15px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    font-size: 0.85rem;
-    color: var(--gold);
-}
-
-.golden-bar {
-    height: 8px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    margin-top: 8px;
-    overflow: hidden;
-}
-
-.golden-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--gold), #ffed4a);
-    width: 0%;
-    transition: width 0.5s ease;
-    border-radius: 4px;
-}
-
-/* Golden Pack Visual */
-.pack-visual.golden-pack {
-    background: linear-gradient(135deg, #ffd700, #ffed4a, #ffc107);
-    box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
-    animation: goldenGlow 2s ease-in-out infinite;
-}
-
-@keyframes goldenGlow {
-    0%, 100% { box-shadow: 0 0 30px rgba(255, 215, 0, 0.6); }
-    50% { box-shadow: 0 0 50px rgba(255, 215, 0, 0.9); }
-}
-
-.pack-card:has(.golden-pack) h3 {
-    color: var(--gold);
-    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
-}
-
-/* ==========================================
-   BATTLE CLARITY IMPROVEMENTS
-   ========================================== */
-
-/* Battle Help Panel */
-.battle-help {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: linear-gradient(135deg, rgba(26, 26, 46, 0.98), rgba(10, 10, 26, 0.98));
-    border: 2px solid var(--gold);
-    border-radius: 15px;
-    padding: 20px;
-    z-index: 200;
-    max-width: 350px;
-    box-shadow: 0 0 30px rgba(255, 215, 0, 0.3);
-    display: none;
-}
-
-.battle-help.visible {
-    display: block;
-    animation: fadeIn 0.3s ease-out;
-}
-
-.help-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    font-size: 1.2rem;
-    color: var(--gold);
-    font-weight: bold;
-}
-
-.help-close {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    font-size: 1.5rem;
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
-}
-
-.help-close:hover {
-    color: #fff;
-}
-
-.help-content p {
-    margin: 10px 0;
-    padding: 8px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 8px;
-    font-size: 0.9rem;
-}
-
-.help-content p strong {
-    color: var(--accent-primary);
-}
-
-.help-content p em {
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-}
-
-.show-help-btn {
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: var(--accent-primary);
-    border: none;
-    font-size: 1.2rem;
-    cursor: pointer;
-    z-index: 100;
-    transition: all 0.3s ease;
-}
-
-.show-help-btn:hover {
-    transform: scale(1.1);
-    background: var(--gold);
-}
-
-/* Phase Indicator */
-.phase-indicator {
-    position: fixed;
-    top: 60px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: linear-gradient(135deg, var(--accent-primary), #2d5a8a);
-    padding: 8px 25px;
-    border-radius: 25px;
-    font-weight: bold;
-    font-size: 1rem;
-    z-index: 50;
-    box-shadow: 0 4px 15px rgba(74, 144, 217, 0.4);
-    transition: all 0.3s ease;
-}
-
-.phase-indicator.opponent-phase {
-    background: linear-gradient(135deg, #e74c3c, #c0392b);
-    box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
-}
-
-/* Action Hint */
-.action-hint {
-    position: fixed;
-    bottom: 120px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.8);
-    padding: 10px 20px;
-    border-radius: 20px;
-    font-size: 0.9rem;
-    z-index: 50;
-    max-width: 90%;
-    text-align: center;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    animation: hintPulse 2s ease-in-out infinite;
-}
-
-@keyframes hintPulse {
-    0%, 100% { opacity: 0.8; }
-    50% { opacity: 1; }
-}
-
-/* Field Labels */
-.field-label, .hand-label {
-    position: absolute;
-    top: -20px;
-    left: 10px;
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.card-field, .card-hand {
-    position: relative;
-}
-
-/* Playable Card Indicator */
-.card.playable {
-    cursor: pointer;
-    box-shadow: 0 0 15px rgba(46, 204, 113, 0.6);
-    border-color: var(--uncommon) !important;
-}
-
-.card.playable::before {
-    content: "▶ PLAY";
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--uncommon);
-    color: #000;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 0.65rem;
-    font-weight: bold;
-    opacity: 0;
-    transition: opacity 0.2s;
-    z-index: 10;
-}
-
-.card.playable:hover::before {
-    opacity: 1;
-}
-
-/* Exhausted card indicator */
-.card.exhausted::after {
-    content: "💤";
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    font-size: 1rem;
-}
-
-/* Wikipedia Link Button */
-.wiki-link-btn {
-    display: inline-block;
-    margin-top: 15px;
-    padding: 12px 25px;
-    background: linear-gradient(135deg, #3a7bd5, #00d2ff);
-    color: #fff;
-    text-decoration: none;
-    border-radius: 25px;
-    font-weight: bold;
-    font-size: 1rem;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(58, 123, 213, 0.4);
-}
-
-.wiki-link-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(58, 123, 213, 0.6);
-    background: linear-gradient(135deg, #4a8be5, #10e2ff);
-}
-
-.wiki-link-btn:active {
-    transform: translateY(0);
-}
-
-/* ==========================================
-   Holographic Card Effects
-   ========================================== */
-
-.holo-card {
-    position: relative;
-}
-
-.holo-card .card-inner {
-    position: relative;
-    overflow: hidden;
-}
-
-.holo-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(
-        125deg,
-        rgba(255, 0, 255, 0.1) 0%,
-        rgba(0, 255, 255, 0.1) 25%,
-        rgba(255, 255, 0, 0.1) 50%,
-        rgba(0, 255, 255, 0.1) 75%,
-        rgba(255, 0, 255, 0.1) 100%
-    );
-    background-size: 200% 200%;
-    animation: holographicShift 3s ease infinite;
-    pointer-events: none;
-    z-index: 1;
-    border-radius: 15px;
-    mix-blend-mode: overlay;
-}
-
-.holo-shine {
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 50%;
-    height: 100%;
-    background: linear-gradient(
-        90deg,
-        transparent,
-        rgba(255, 255, 255, 0.3),
-        transparent
-    );
-    animation: holographicSheen 2.5s ease-in-out infinite;
-    pointer-events: none;
-    z-index: 2;
-}
-
-@keyframes holographicShift {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-}
-
-@keyframes holographicSheen {
-    0% { left: -100%; }
-    100% { left: 200%; }
-}
-
-/* Legendary cards get extra glow */
-.holo-card.legendary {
-    box-shadow: 0 0 20px rgba(255, 152, 0, 0.5), 0 0 40px rgba(255, 152, 0, 0.3);
-}
-
-.holo-card.legendary:hover {
-    box-shadow: 0 0 30px rgba(255, 152, 0, 0.7), 0 0 60px rgba(255, 152, 0, 0.4);
-}
-
-/* Epic cards get purple glow */
-.holo-card.epic {
-    box-shadow: 0 0 15px rgba(156, 39, 176, 0.4), 0 0 30px rgba(156, 39, 176, 0.2);
-}
-
-.holo-card.epic:hover {
-    box-shadow: 0 0 25px rgba(156, 39, 176, 0.6), 0 0 50px rgba(156, 39, 176, 0.3);
-}
-
-/* Category Badge */
-.category-badge {
-    position: absolute;
-    top: 5px;
-    left: 5px;
-    background: rgba(0, 0, 0, 0.7);
-    color: #fff;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    z-index: 3;
-}
-
-/* ==========================================
-   Achievement System Styles
-   ========================================== */
-
-#achievements-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
-    padding: 20px;
-    justify-content: center;
-}
-
-.achievement-badge {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: linear-gradient(135deg, var(--bg-card), var(--bg-light));
-    border-radius: 12px;
-    padding: 15px 20px;
-    min-width: 200px;
-    border: 2px solid transparent;
-    transition: all 0.3s ease;
-}
-
-.achievement-badge.unlocked {
-    border-color: var(--gold);
-    box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
-}
-
-.achievement-badge.locked {
-    opacity: 0.5;
-    filter: grayscale(80%);
-}
-
-.achievement-icon {
-    font-size: 2rem;
-}
-
-.achievement-info {
-    display: flex;
-    flex-direction: column;
-}
-
-.achievement-name {
-    font-weight: bold;
-    color: var(--text-primary);
-    font-size: 0.95rem;
-}
-
-.achievement-desc {
-    color: var(--text-secondary);
-    font-size: 0.8rem;
-}
-
-/* Notification Animations */
-@keyframes slideDown {
-    from {
-        transform: translateX(-50%) translateY(-100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateX(-50%) translateY(0);
-        opacity: 1;
+function closeCheatMenu() {
+    const menu = document.getElementById('cheat-menu');
+    if (menu) menu.classList.add('hidden');
+}
+
+function createCheatMenu() {
+    const menu = document.createElement('div');
+    menu.id = 'cheat-menu';
+    menu.innerHTML = `
+        <div class="cheat-menu-content">
+            <h2>🎮 Cheat Menu</h2>
+            <p class="cheat-hint">Press ESC or 1234 to close</p>
+
+            <div class="cheat-section">
+                <h3>💰 Resources</h3>
+                <button onclick="cheatAddTickets(10)">+10 Tickets</button>
+                <button onclick="cheatAddTickets(100)">+100 Tickets</button>
+                <button onclick="cheatAddTickets(1000)">+1000 Tickets</button>
+            </div>
+
+            <div class="cheat-section">
+                <h3>🃏 Cards</h3>
+                <button onclick="cheatAddRandomCards(5)">+5 Random Cards</button>
+                <button onclick="cheatAddRandomCards(20)">+20 Random Cards</button>
+                <button onclick="cheatGuaranteedLegendary()">Spawn Legendary</button>
+                <button onclick="cheatClearCards()">Clear All Cards</button>
+            </div>
+
+            <div class="cheat-section">
+                <h3>📦 Packs</h3>
+                <button onclick="cheatForceGoldenPack()">Force Golden Pack</button>
+                <button onclick="cheatResetPackCounter()">Reset Pack Counter</button>
+            </div>
+
+            <div class="cheat-section">
+                <h3>🏆 Progress</h3>
+                <button onclick="cheatUnlockAllAchievements()">Unlock All Achievements</button>
+                <button onclick="cheatAddBattleWins(10)">+10 Battle Wins</button>
+                <button onclick="cheatResetProgress()">⚠️ Reset All Progress</button>
+            </div>
+
+            <div class="cheat-section">
+                <h3>⚔️ Battle</h3>
+                <button onclick="cheatWinBattle()">Instant Win</button>
+                <button onclick="cheatKillOpponent()">Kill Opponent</button>
+                <button onclick="cheatFullEnergy()">Max Energy</button>
+            </div>
+        </div>
+    `;
+
+    menu.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.95);
+        z-index: 9999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overflow-y: auto;
+    `;
+
+    document.body.appendChild(menu);
+
+    // Add styles for cheat menu
+    if (!document.getElementById('cheat-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'cheat-styles';
+        styles.textContent = `
+            .cheat-menu-content {
+                background: linear-gradient(135deg, #1a1a2e, #16213e);
+                border: 3px solid #ff0066;
+                border-radius: 20px;
+                padding: 30px;
+                max-width: 500px;
+                width: 90%;
+                max-height: 90vh;
+                overflow-y: auto;
+                box-shadow: 0 0 50px rgba(255, 0, 102, 0.5);
+            }
+            .cheat-menu-content h2 {
+                color: #ff0066;
+                text-align: center;
+                font-size: 2rem;
+                margin-bottom: 5px;
+                text-shadow: 0 0 10px rgba(255, 0, 102, 0.8);
+            }
+            .cheat-hint {
+                text-align: center;
+                color: #888;
+                font-size: 0.8rem;
+                margin-bottom: 20px;
+            }
+            .cheat-section {
+                margin-bottom: 20px;
+                padding: 15px;
+                background: rgba(0, 0, 0, 0.3);
+                border-radius: 10px;
+            }
+            .cheat-section h3 {
+                color: #fff;
+                margin-bottom: 10px;
+                font-size: 1rem;
+            }
+            .cheat-section button {
+                background: linear-gradient(135deg, #ff0066, #ff6600);
+                border: none;
+                color: white;
+                padding: 10px 15px;
+                margin: 5px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: bold;
+                transition: all 0.2s;
+            }
+            .cheat-section button:hover {
+                transform: scale(1.05);
+                box-shadow: 0 0 15px rgba(255, 0, 102, 0.7);
+            }
+            .cheat-section button:active {
+                transform: scale(0.95);
+            }
+        `;
+        document.head.appendChild(styles);
     }
 }
 
-@keyframes fadeOut {
-    from { opacity: 1; }
-    to { opacity: 0; }
+// Cheat Functions
+function cheatAddTickets(amount) {
+    gameState.tickets += amount;
+    saveGameState();
+    updateUI();
+    showNotification(`🎟️ +${amount} Tickets!`);
 }
+
+function cheatAddRandomCards(count) {
+    showNotification(`⏳ Generating ${count} cards...`);
+    let added = 0;
+
+    const addNext = async () => {
+        if (added < count) {
+            const card = await generateCard();
+            if (card) {
+                gameState.cards.push(card);
+                added++;
+            }
+            setTimeout(addNext, 100);
+        } else {
+            saveGameState();
+            updateUI();
+            showNotification(`🃏 Added ${added} cards!`);
+            checkAchievements();
+        }
+    };
+    addNext();
+}
+
+async function cheatGuaranteedLegendary() {
+    showNotification('⏳ Creating Legendary...');
+    const card = await generateCard();
+    if (card) {
+        card.rarity = 'legendary';
+        card.attack += 5;
+        card.defense += 4;
+        card.knowledge += 3;
+        card.cost = ENERGY_COSTS.legendary;
+        gameState.cards.push(card);
+        saveGameState();
+        updateUI();
+        showNotification(`👑 Legendary "${card.name}" added!`);
+        checkAchievements();
+    }
+}
+
+function cheatClearCards() {
+    if (confirm('Delete ALL cards? This cannot be undone!')) {
+        gameState.cards = [];
+        gameState.deck = [];
+        saveGameState();
+        updateUI();
+        showNotification('🗑️ All cards cleared!');
+    }
+}
+
+function cheatForceGoldenPack() {
+    gameState.packsOpened = 9; // Next pack will be golden (10th)
+    updateGoldenPackProgress();
+    saveGameState();
+    showNotification('✨ Next pack is GOLDEN!');
+}
+
+function cheatResetPackCounter() {
+    gameState.packsOpened = 0;
+    updateGoldenPackProgress();
+    saveGameState();
+    showNotification('📦 Pack counter reset!');
+}
+
+function cheatUnlockAllAchievements() {
+    for (const key of Object.keys(gameState.achievements)) {
+        gameState.achievements[key] = true;
+    }
+    saveGameState();
+    updateAchievementsDisplay();
+    showNotification('🏆 All achievements unlocked!');
+}
+
+function cheatAddBattleWins(amount) {
+    gameState.battlesWon += amount;
+    saveGameState();
+    checkAchievements();
+    showNotification(`⚔️ +${amount} battle wins!`);
+}
+
+function cheatResetProgress() {
+    if (confirm('⚠️ RESET ALL PROGRESS? This deletes everything!')) {
+        localStorage.removeItem('wikicards_save');
+        location.reload();
+    }
+}
+
+function cheatWinBattle() {
+    if (gameState.currentBattle) {
+        endBattle(true);
+        closeCheatMenu();
+        showNotification('🎉 Battle won!');
+    } else if (gameState.bossBattle) {
+        endBossBattle(true);
+        closeCheatMenu();
+        showNotification('👑 Boss defeated!');
+    } else {
+        showNotification('❌ Not in a battle!');
+    }
+}
+
+function cheatKillOpponent() {
+    if (gameState.currentBattle || gameState.bossBattle) {
+        gameState.opponentHealth = 0;
+        renderBattle();
+        showNotification('💀 Opponent health set to 0!');
+    } else {
+        showNotification('❌ Not in a battle!');
+    }
+}
+
+function cheatFullEnergy() {
+    if (gameState.currentBattle || gameState.bossBattle) {
+        gameState.playerEnergy = 10;
+        renderBattle();
+        showNotification('⚡ Energy maxed!');
+    } else {
+        showNotification('❌ Not in a battle!');
+    }
+}
+
